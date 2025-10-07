@@ -21,7 +21,7 @@ def signup(request):
             user = form.save()
             login(request, user)
             messages.success(request, 'アカウントが作成されました。')
-            return redirect('schedule:index')
+            return redirect('schedule:project_list')
     else:
         form = CustomUserCreationForm()
     
@@ -30,7 +30,7 @@ def signup(request):
 @manager_required
 def user_list(request):
     """ユーザー一覧（マネージャー専用）"""
-    users = User.objects.all().order_by('username')
+    users = User.objects.filter(is_superuser=False).order_by('username')
     
     # 検索機能
     search = request.GET.get('search')
@@ -41,6 +41,10 @@ def user_list(request):
             email__icontains=search
         ) | users.filter(
             department__icontains=search
+        ) | users.filter(
+            first_name__icontains=search
+        ) | users.filter(
+            last_name__icontains=search
         )
     
     # ページネーション

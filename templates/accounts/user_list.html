@@ -26,7 +26,7 @@
                     </div>
                     <div class="col-md-4">
                         <form method="get" class="d-flex">
-                            <input type="text" name="search" class="form-control" placeholder="ユーザー検索..." value="{{ search }}">
+                            <input type="text" name="search" class="form-control" placeholder="ユーザー検索..." value="{{ search|default:'' }}">
                             <button type="submit" class="btn btn-outline-secondary ms-2">
                                 <i class="bi bi-search"></i>
                             </button>
@@ -64,6 +64,8 @@
                                             <span class="badge bg-danger">スーパーユーザー</span>
                                         {% elif user.is_manager %}
                                             <span class="badge bg-warning">マネージャー</span>
+                                        {% elif user.is_viewer %}
+                                            <span class="badge bg-info">閲覧者</span>
                                         {% else %}
                                             <span class="badge bg-secondary">一般ユーザー</span>
                                         {% endif %}

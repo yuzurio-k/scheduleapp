@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load calendar_filters %}
 
 {% block title %}案件一覧 - {{ block.super }}{% endblock %}
 
@@ -9,9 +10,11 @@
             <h1>
                 <i class="bi bi-folder"></i> 案件一覧
             </h1>
+            {% if not user.is_viewer %}
             <a href="{% url 'schedule:project_create' %}" class="btn btn-primary">
                 <i class="bi bi-plus-circle"></i> 新しい案件
             </a>
+            {% endif %}
         </div>
     </div>
 </div>
@@ -20,31 +23,43 @@
     <div class="col-md-12">
         <div class="card">
             <div class="card-body">
-                {% if projects %}
-                    <div class="row mb-3">
-                        <div class="col-md-6">
-                            <label class="form-label">状態フィルタ:</label>
-                            <div class="btn-group" role="group">
-                                <a href="?status=all{% if current_sort != 'name' %}&sort={{ current_sort }}{% endif %}" class="btn {% if current_status == 'all' %}btn-primary{% else %}btn-outline-primary{% endif %} btn-sm">全て</a>
-                                <a href="?status=active{% if current_sort != 'name' %}&sort={{ current_sort }}{% endif %}" class="btn {% if current_status == 'active' %}btn-primary{% else %}btn-outline-primary{% endif %} btn-sm">進行中</a>
-                                <a href="?status=completed{% if current_sort != 'name' %}&sort={{ current_sort }}{% endif %}" class="btn {% if current_status == 'completed' %}btn-primary{% else %}btn-outline-primary{% endif %} btn-sm">完了</a>
-                            </div>
+                <div class="row mb-3">
+                    <div class="col-md-3">
+                        <label class="form-label">状態フィルタ:</label>
+                        <div class="btn-group" role="group">
+                            <a href="?status=all{% if current_sort != 'name' %}&sort={{ current_sort }}{% endif %}{% if user.is_manager or user.is_superuser %}{% if current_assignee != 'all' %}&assignee={{ current_assignee }}{% endif %}{% endif %}" class="btn {% if current_status == 'all' %}btn-primary{% else %}btn-outline-primary{% endif %} btn-sm">全て</a>
+                            <a href="?status=active{% if current_sort != 'name' %}&sort={{ current_sort }}{% endif %}{% if user.is_manager or user.is_superuser %}{% if current_assignee != 'all' %}&assignee={{ current_assignee }}{% endif %}{% endif %}" class="btn {% if current_status == 'active' %}btn-primary{% else %}btn-outline-primary{% endif %} btn-sm">進行中</a>
+                            <a href="?status=completed{% if current_sort != 'name' %}&sort={{ current_sort }}{% endif %}{% if user.is_manager or user.is_superuser %}{% if current_assignee != 'all' %}&assignee={{ current_assignee }}{% endif %}{% endif %}" class="btn {% if current_status == 'completed' %}btn-primary{% else %}btn-outline-primary{% endif %} btn-sm">完了</a>
                         </div>
-                        {% if user.is_manager or user.is_superuser %}
-                        <div class="col-md-6">
-                            <label class="form-label">ソート順:</label>
-                            <div class="btn-group" role="group">
-                                <a href="?sort=name{% if current_status != 'all' %}&status={{ current_status }}{% endif %}" class="btn {% if current_sort == 'name' %}btn-primary{% else %}btn-outline-primary{% endif %} btn-sm">案件名</a>
-                                <a href="?sort=manufacturing_number{% if current_status != 'all' %}&status={{ current_status }}{% endif %}" class="btn {% if current_sort == 'manufacturing_number' %}btn-primary{% else %}btn-outline-primary{% endif %} btn-sm">製造番号</a>
-                                <a href="?sort=due_date{% if current_status != 'all' %}&status={{ current_status }}{% endif %}" class="btn {% if current_sort == 'due_date' %}btn-primary{% else %}btn-outline-primary{% endif %} btn-sm">納期</a>
-                                <a href="?sort=assigned_to{% if current_status != 'all' %}&status={{ current_status }}{% endif %}" class="btn {% if current_sort == 'assigned_to' %}btn-primary{% else %}btn-outline-primary{% endif %} btn-sm">担当者</a>
-                                <a href="?sort=created_by{% if current_status != 'all' %}&status={{ current_status }}{% endif %}" class="btn {% if current_sort == 'created_by' %}btn-primary{% else %}btn-outline-primary{% endif %} btn-sm">登録者</a>
-                                <a href="?sort=created_at{% if current_status != 'all' %}&status={{ current_status }}{% endif %}" class="btn {% if current_sort == 'created_at' %}btn-primary{% else %}btn-outline-primary{% endif %} btn-sm">作成日</a>
-                                <a href="?sort=completed_at{% if current_status != 'all' %}&status={{ current_status }}{% endif %}" class="btn {% if current_sort == 'completed_at' %}btn-primary{% else %}btn-outline-primary{% endif %} btn-sm">完了日</a>
-                            </div>
-                        </div>
-                        {% endif %}
                     </div>
+                    {% if user.is_manager or user.is_superuser %}
+                    <div class="col-md-3">
+                        <label class="form-label">担当者:</label>
+                        <div class="btn-group" role="group">
+                            <a href="?assignee=all{% if current_status != 'all' %}&status={{ current_status }}{% endif %}{% if current_sort != 'name' %}&sort={{ current_sort }}{% endif %}" class="btn {% if current_assignee == 'all' or current_assignee == '' %}btn-primary{% else %}btn-outline-primary{% endif %} btn-sm">全員</a>
+                            <a href="?assignee=me{% if current_status != 'all' %}&status={{ current_status }}{% endif %}{% if current_sort != 'name' %}&sort={{ current_sort }}{% endif %}" class="btn {% if current_assignee == 'me' %}btn-primary{% else %}btn-outline-primary{% endif %} btn-sm">自分のみ</a>
+                        </div>
+                    </div>
+                    {% elif user.is_viewer %}
+                    <div class="col-md-3">
+                        <label class="form-label">権限:</label>
+                        <span class="badge bg-info">閲覧のみ</span>
+                    </div>
+                    {% endif %}
+                    <div class="col-md-6">
+                        <label class="form-label">ソート順:</label>
+                        <div class="btn-group" role="group">
+                            <a href="?sort=name{% if current_status != 'all' %}&status={{ current_status }}{% endif %}{% if user.is_manager or user.is_superuser %}{% if current_assignee != 'all' %}&assignee={{ current_assignee }}{% endif %}{% endif %}" class="btn {% if current_sort == 'name' %}btn-primary{% else %}btn-outline-primary{% endif %} btn-sm">案件名</a>
+                            <a href="?sort=manufacturing_number{% if current_status != 'all' %}&status={{ current_status }}{% endif %}{% if user.is_manager or user.is_superuser %}{% if current_assignee != 'all' %}&assignee={{ current_assignee }}{% endif %}{% endif %}" class="btn {% if current_sort == 'manufacturing_number' %}btn-primary{% else %}btn-outline-primary{% endif %} btn-sm">製造番号</a>
+                            <a href="?sort=due_date{% if current_status != 'all' %}&status={{ current_status }}{% endif %}{% if user.is_manager or user.is_superuser %}{% if current_assignee != 'all' %}&assignee={{ current_assignee }}{% endif %}{% endif %}" class="btn {% if current_sort == 'due_date' %}btn-primary{% else %}btn-outline-primary{% endif %} btn-sm">納期</a>
+                            <a href="?sort=assigned_to{% if current_status != 'all' %}&status={{ current_status }}{% endif %}{% if user.is_manager or user.is_superuser %}{% if current_assignee != 'all' %}&assignee={{ current_assignee }}{% endif %}{% endif %}" class="btn {% if current_sort == 'assigned_to' %}btn-primary{% else %}btn-outline-primary{% endif %} btn-sm">担当者</a>
+                            <a href="?sort=created_at{% if current_status != 'all' %}&status={{ current_status }}{% endif %}{% if user.is_manager or user.is_superuser %}{% if current_assignee != 'all' %}&assignee={{ current_assignee }}{% endif %}{% endif %}" class="btn {% if current_sort == 'created_at' %}btn-primary{% else %}btn-outline-primary{% endif %} btn-sm">作成日</a>
+                            <a href="?sort=completed_at{% if current_status != 'all' %}&status={{ current_status }}{% endif %}{% if user.is_manager or user.is_superuser %}{% if current_assignee != 'all' %}&assignee={{ current_assignee }}{% endif %}{% endif %}" class="btn {% if current_sort == 'completed_at' %}btn-primary{% else %}btn-outline-primary{% endif %} btn-sm">完了日</a>
+                        </div>
+                    </div>
+                </div>
+                
+                {% if projects %}
                     <div class="table-responsive">
                         <table class="table table-hover">
                             <thead>
@@ -56,7 +71,6 @@
                                     {% if current_status == 'completed' %}
                                     <th>完了日</th>
                                     {% endif %}
-                                    <th>登録者</th>
                                     <th>担当者</th>
                                     <th>作成日</th>
                                     <th>操作</th>
@@ -80,7 +94,7 @@
                                     </td>
                                     <td>
                                         {% if project.is_completed %}
-                                            <span class="badge bg-success">完了</span>
+                                            <span class="badge bg-danger">完了</span>
                                         {% else %}
                                             <span class="badge bg-primary">進行中</span>
                                         {% endif %}
@@ -88,17 +102,14 @@
                                     {% if current_status == 'completed' %}
                                     <td>
                                         {% if project.completed_at %}
-                                            <span class="badge bg-success">{{ project.completed_at|date:"Y/m/d" }}</span>
+                                            <span class="badge bg-danger">{{ project.completed_at|date:"Y/m/d" }}</span>
                                         {% else %}
                                             <span class="text-muted">-</span>
                                         {% endif %}
                                     </td>
                                     {% endif %}
                                     <td>
-                                        <span class="badge bg-info">{% if project.created_by.first_name or project.created_by.last_name %}{{ project.created_by.last_name }} {{ project.created_by.first_name }}{% else %}{{ project.created_by.username }}{% endif %}</span>
-                                    </td>
-                                    <td>
-                                        <span class="badge bg-success">{% if project.assigned_to.first_name or project.assigned_to.last_name %}{{ project.assigned_to.last_name }} {{ project.assigned_to.first_name }}{% else %}{{ project.assigned_to.username }}{% endif %}</span>
+                                        <span class="badge" style="background-color: {{ project.assigned_bg_color }}; color: {{ project.assigned_text_color }};">{% if project.assigned_to.first_name or project.assigned_to.last_name %}{{ project.assigned_to.last_name }} {{ project.assigned_to.first_name }}{% else %}{{ project.assigned_to.username }}{% endif %}</span>
                                     </td>
                                     <td>{{ project.created_at|date:"Y/m/d" }}</td>
                                     <td>
@@ -106,10 +117,17 @@
                                             <a href="{% url 'schedule:project_detail' project.pk %}" class="btn btn-outline-primary">
                                                 詳細
                                             </a>
-                                            {% if project.created_by == user or user.is_manager or user.is_superuser %}
+                                            {% if not user.is_viewer %}
+                                                {% if project.created_by == user or user.is_manager or user.is_superuser %}
                                             <a href="{% url 'schedule:project_edit' project.pk %}" class="btn btn-outline-secondary">
                                                 編集
                                             </a>
+                                                    {% if project.can_be_deleted %}
+                                            <a href="{% url 'schedule:project_delete' project.pk %}" class="btn btn-outline-danger" onclick="return confirm('この案件を削除しますか？スケジュールが登録されている案件は削除できません。')">
+                                                削除
+                                            </a>
+                                                    {% endif %}
+                                                {% endif %}
                                             {% endif %}
                                         </div>
                                     </td>
@@ -122,14 +140,20 @@
                     <div class="text-center py-5">
                         <i class="bi bi-folder-x display-1 text-muted"></i>
                         <h3 class="text-muted mt-3">案件がありません</h3>
+                        {% if not user.is_viewer %}
                         <p class="text-muted">まずは最初の案件を作成してみましょう。</p>
                         <a href="{% url 'schedule:project_create' %}" class="btn btn-primary">
                             <i class="bi bi-plus-circle"></i> 案件を作成
                         </a>
+                        {% else %}
+                        <p class="text-muted">現在、該当する案件がありません。</p>
+                        {% endif %}
                     </div>
                 {% endif %}
             </div>
         </div>
     </div>
 </div>
+
+
 {% endblock %}

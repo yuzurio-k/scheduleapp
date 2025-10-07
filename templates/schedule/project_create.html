@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+
+{% block title %}新しい案件の作成 - {{ block.super }}{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-8 mx-auto">
+        <div class="card">
+            <div class="card-header">
+                <h4 class="card-title mb-0">
+                    <i class="bi bi-folder-plus"></i> 新しい案件の作成
+                </h4>
+            </div>
+            <div class="card-body">
+                <form method="post">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label for="{{ form.name.id_for_label }}" class="form-label">案件名 <span class="text-danger">*</span></label>
+                        {{ form.name }}
+                        {% if form.name.errors %}
+                            <div class="text-danger">{{ form.name.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="{{ form.manufacturing_number.id_for_label }}" class="form-label">製造番号</label>
+                        {{ form.manufacturing_number }}
+                        {% if form.manufacturing_number.errors %}
+                            <div class="text-danger">{{ form.manufacturing_number.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="{{ form.due_date.id_for_label }}" class="form-label">納期</label>
+                        {{ form.due_date }}
+                        {% if form.due_date.errors %}
+                            <div class="text-danger">{{ form.due_date.errors.0 }}</div>
+                        {% endif %}
+                        <div class="form-text text-muted">
+                            <i class="bi bi-calendar"></i> 納期は任意入力です。
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="{{ form.assigned_to.id_for_label }}" class="form-label">担当者 <span class="text-danger">*</span></label>
+                        {{ form.assigned_to }}
+                        {% if form.assigned_to.errors %}
+                            <div class="text-danger">{{ form.assigned_to.errors.0 }}</div>
+                        {% endif %}
+                        {% if not user.is_manager and not user.is_superuser %}
+                            <div class="form-text text-muted">
+                                <i class="bi bi-info-circle"></i> 一般ユーザーは自分のみを担当者として設定できます。
+                            </div>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="{{ form.description.id_for_label }}" class="form-label">詳細</label>
+                        {{ form.description }}
+                        {% if form.description.errors %}
+                            <div class="text-danger">{{ form.description.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-check-circle"></i> 案件を作成
+                        </button>
+                        <a href="{% url 'schedule:project_list' %}" class="btn btn-secondary">
+                            <i class="bi bi-arrow-left"></i> キャンセル
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -17,7 +17,7 @@
                     <div class="row">
                         <div class="col-md-6">
                             <div class="mb-3">
-                                <label for="{{ form.username.id_for_label }}" class="form-label">ユーザー名</label>
+                                <label for="{{ form.username.id_for_label }}" class="form-label">ユーザー名 <span class="text-danger">*</span></label>
                                 {{ form.username }}
                                 {% if form.username.errors %}
                                     <div class="text-danger">{{ form.username.errors.0 }}</div>
@@ -26,7 +26,7 @@
                         </div>
                         <div class="col-md-6">
                             <div class="mb-3">
-                                <label for="{{ form.email.id_for_label }}" class="form-label">メールアドレス</label>
+                                <label for="{{ form.email.id_for_label }}" class="form-label">メールアドレス <span class="text-muted">(任意)</span></label>
                                 {{ form.email }}
                                 {% if form.email.errors %}
                                     <div class="text-danger">{{ form.email.errors.0 }}</div>
@@ -38,19 +38,19 @@
                     <div class="row">
                         <div class="col-md-6">
                             <div class="mb-3">
-                                <label for="{{ form.first_name.id_for_label }}" class="form-label">名前</label>
-                                {{ form.first_name }}
-                                {% if form.first_name.errors %}
-                                    <div class="text-danger">{{ form.first_name.errors.0 }}</div>
+                                <label for="{{ form.last_name.id_for_label }}" class="form-label">姓 <span class="text-danger">*</span></label>
+                                {{ form.last_name }}
+                                {% if form.last_name.errors %}
+                                    <div class="text-danger">{{ form.last_name.errors.0 }}</div>
                                 {% endif %}
                             </div>
                         </div>
                         <div class="col-md-6">
                             <div class="mb-3">
-                                <label for="{{ form.last_name.id_for_label }}" class="form-label">姓</label>
-                                {{ form.last_name }}
-                                {% if form.last_name.errors %}
-                                    <div class="text-danger">{{ form.last_name.errors.0 }}</div>
+                                <label for="{{ form.first_name.id_for_label }}" class="form-label">名前 <span class="text-danger">*</span></label>
+                                {{ form.first_name }}
+                                {% if form.first_name.errors %}
+                                    <div class="text-danger">{{ form.first_name.errors.0 }}</div>
                                 {% endif %}
                             </div>
                         </div>
@@ -59,7 +59,7 @@
                     <div class="row">
                         <div class="col-md-6">
                             <div class="mb-3">
-                                <label for="{{ form.department.id_for_label }}" class="form-label">部署</label>
+                                <label for="{{ form.department.id_for_label }}" class="form-label">部署 <span class="text-danger">*</span></label>
                                 {{ form.department }}
                                 {% if form.department.errors %}
                                     <div class="text-danger">{{ form.department.errors.0 }}</div>
@@ -68,7 +68,7 @@
                         </div>
                         <div class="col-md-6">
                             <div class="mb-3">
-                                <label for="{{ form.phone.id_for_label }}" class="form-label">電話番号</label>
+                                <label for="{{ form.phone.id_for_label }}" class="form-label">電話番号 <span class="text-muted">(任意)</span></label>
                                 {{ form.phone }}
                                 {% if form.phone.errors %}
                                     <div class="text-danger">{{ form.phone.errors.0 }}</div>
@@ -78,7 +78,7 @@
                     </div>
                     
                     <div class="row">
-                        <div class="col-md-6">
+                        <div class="col-md-4">
                             <div class="mb-3 form-check">
                                 {{ form.is_manager }}
                                 <label class="form-check-label" for="{{ form.is_manager.id_for_label }}">
@@ -89,7 +89,19 @@
                                 {% endif %}
                             </div>
                         </div>
-                        <div class="col-md-6">
+                        <div class="col-md-4">
+                            <div class="mb-3 form-check">
+                                {{ form.is_viewer }}
+                                <label class="form-check-label" for="{{ form.is_viewer.id_for_label }}">
+                                    閲覧者権限
+                                </label>
+                                <small class="form-text text-muted d-block">全員の案件を閲覧できますが編集はできません</small>
+                                {% if form.is_viewer.errors %}
+                                    <div class="text-danger">{{ form.is_viewer.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="col-md-4">
                             <div class="mb-3 form-check">
                                 {{ form.is_active }}
                                 <label class="form-check-label" for="{{ form.is_active.id_for_label }}">

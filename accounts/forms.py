@@ -5,13 +5,15 @@ from django.contrib.auth import get_user_model
 User = get_user_model()
 
 class CustomUserCreationForm(UserCreationForm):
-    email = forms.EmailField(required=True, widget=forms.EmailInput(attrs={'class': 'form-control'}))
-    department = forms.CharField(max_length=100, required=False, widget=forms.TextInput(attrs={'class': 'form-control'}))
+    email = forms.EmailField(required=False, widget=forms.EmailInput(attrs={'class': 'form-control'}))
+    first_name = forms.CharField(max_length=150, required=True, widget=forms.TextInput(attrs={'class': 'form-control'}))
+    last_name = forms.CharField(max_length=150, required=True, widget=forms.TextInput(attrs={'class': 'form-control'}))
+    department = forms.CharField(max_length=100, required=True, widget=forms.TextInput(attrs={'class': 'form-control'}))
     phone = forms.CharField(max_length=20, required=False, widget=forms.TextInput(attrs={'class': 'form-control'}))
 
     class Meta:
         model = User
-        fields = ("username", "email", "department", "phone", "password1", "password2")
+        fields = ("username", "email", "first_name", "last_name", "department", "phone", "password1", "password2")
         widgets = {
             'username': forms.TextInput(attrs={'class': 'form-control'}),
         }
@@ -24,6 +26,8 @@ class CustomUserCreationForm(UserCreationForm):
     def save(self, commit=True):
         user = super().save(commit=False)
         user.email = self.cleaned_data["email"]
+        user.first_name = self.cleaned_data["first_name"]
+        user.last_name = self.cleaned_data["last_name"]
         user.department = self.cleaned_data["department"]
         user.phone = self.cleaned_data["phone"]
         if commit:
@@ -32,9 +36,20 @@ class CustomUserCreationForm(UserCreationForm):
 
 class UserManagementForm(forms.ModelForm):
     """マネージャー用のユーザー管理フォーム"""
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # 必須フィールドの設定
+        self.fields['first_name'].required = True
+        self.fields['last_name'].required = True
+        self.fields['department'].required = True
+        # 任意フィールドの設定
+        self.fields['email'].required = False
+        self.fields['phone'].required = False
+    
     class Meta:
         model = User
-        fields = ['username', 'email', 'first_name', 'last_name', 'department', 'phone', 'is_manager', 'is_active']
+        fields = ['username', 'email', 'first_name', 'last_name', 'department', 'phone', 'is_manager', 'is_viewer', 'is_active']
         widgets = {
             'username': forms.TextInput(attrs={'class': 'form-control'}),
             'email': forms.EmailInput(attrs={'class': 'form-control'}),
@@ -43,11 +58,23 @@ class UserManagementForm(forms.ModelForm):
             'department': forms.TextInput(attrs={'class': 'form-control'}),
             'phone': forms.TextInput(attrs={'class': 'form-control'}),
             'is_manager': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'is_viewer': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
             'is_active': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
         }
 
 class UserProfileForm(forms.ModelForm):
     """一般ユーザー用のプロフィール編集フォーム"""
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # 必須フィールドの設定
+        self.fields['first_name'].required = True
+        self.fields['last_name'].required = True
+        self.fields['department'].required = True
+        # 任意フィールドの設定
+        self.fields['email'].required = False
+        self.fields['phone'].required = False
+    
     class Meta:
         model = User
         fields = ['username', 'email', 'first_name', 'last_name', 'department', 'phone']

@@ -23,5 +23,5 @@ urlpatterns = [
     path('accounts/', include('django.contrib.auth.urls')),
     path('accounts/', include('accounts.urls')),
     path('schedule/', include('schedule.urls')),
-    path('', RedirectView.as_view(url='/schedule/', permanent=True)),
+    path('', RedirectView.as_view(url='/schedule/projects/', permanent=True)),
 ]

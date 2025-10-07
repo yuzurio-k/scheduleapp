@@ -53,8 +53,8 @@ class ProjectForm(forms.ModelForm):
         if user:
             # 担当者の選択肢を設定
             if user.is_manager or user.is_superuser:
-                # マネージャーは全ユーザーから選択可能
-                self.fields['assigned_to'].queryset = User.objects.filter(is_active=True).order_by('last_name', 'first_name', 'username')
+                # マネージャーは全ユーザーから選択可能（スーパーユーザー除く）
+                self.fields['assigned_to'].queryset = User.objects.filter(is_active=True, is_superuser=False).order_by('last_name', 'first_name', 'username')
             else:
                 # 一般ユーザーは自分のみ
                 self.fields['assigned_to'].queryset = User.objects.filter(id=user.id)

@@ -33,3 +33,11 @@ def is_schedule_on_date(schedule, date_info):
         return schedule.start_date <= current_date <= schedule.end_date
     except (ValueError, AttributeError, TypeError):
         return False
+
+@register.filter
+def person_color_class(user):
+    """ユーザーIDに応じて色クラスを返すフィルター"""
+    if user and user.id:
+        color_index = (user.id % 10) + 1  # 1-10の範囲
+        return f'badge-person-{color_index}'
+    return 'badge-person-1'

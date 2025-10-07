@@ -16,19 +16,23 @@
                     </h4>
                     <div class="d-flex gap-2">
                         {% if project.created_by == user or project.assigned_to == user or user.is_manager or user.is_superuser %}
-                            {% if project.is_completed %}
-                                <a href="{% url 'schedule:project_complete' project.pk %}" class="btn btn-outline-warning btn-sm">
-                                    <i class="bi bi-arrow-clockwise"></i> 未完了に戻す
-                                </a>
-                            {% else %}
-                                <a href="{% url 'schedule:project_complete' project.pk %}" class="btn btn-outline-success btn-sm">
-                                    <i class="bi bi-check-circle"></i> 完了にする
-                                </a>
+                            {% if not user.is_viewer %}
+                                {% if project.is_completed %}
+                                    <a href="{% url 'schedule:project_complete' project.pk %}" class="btn btn-outline-warning btn-sm">
+                                        <i class="bi bi-arrow-clockwise"></i> 未完了に戻す
+                                    </a>
+                                {% else %}
+                                    <a href="{% url 'schedule:project_complete' project.pk %}" class="btn btn-outline-success btn-sm">
+                                        <i class="bi bi-check-circle"></i> 完了にする
+                                    </a>
+                                {% endif %}
                             {% endif %}
                         {% endif %}
+                        {% if not user.is_viewer %}
                         <a href="{% url 'schedule:schedule_create' %}?project={{ project.pk }}" class="btn btn-outline-primary btn-sm">
                             <i class="bi bi-calendar-plus"></i> スケジュール追加
                         </a>
+                        {% endif %}
                     </div>
                 </div>
             </div>
@@ -157,6 +161,7 @@
                                                     <i class="bi bi-check-circle"></i>
                                                 </a>
                                             {% endif %}
+                                            {% if not user.is_viewer %}
                                             <a href="{% url 'schedule:schedule_edit' schedule.id %}" 
                                                class="btn btn-sm btn-outline-primary" 
                                                title="編集">
@@ -168,6 +173,7 @@
                                                onclick="return confirm('このスケジュールを削除しますか？')">
                                                 <i class="bi bi-trash"></i>
                                             </a>
+                                            {% endif %}
                                         </div>
                                     </td>
                                 </tr>
@@ -198,23 +204,34 @@
                     <a href="{% url 'schedule:project_list' %}" class="btn btn-outline-secondary">
                         <i class="bi bi-arrow-left"></i> 案件一覧に戻る
                     </a>
-                    {% if project.created_by == user or user.is_manager or user.is_superuser %}
-                    <a href="{% url 'schedule:project_edit' project.pk %}" class="btn btn-outline-warning">
-                        <i class="bi bi-pencil"></i> 案件を編集
-                    </a>
+                    {% if not user.is_viewer %}
+                        {% if project.created_by == user or user.is_manager or user.is_superuser %}
+                        <a href="{% url 'schedule:project_edit' project.pk %}" class="btn btn-outline-warning">
+                            <i class="bi bi-pencil"></i> 案件を編集
+                        </a>
+                            {% if project.can_be_deleted %}
+                        <a href="{% url 'schedule:project_delete' project.pk %}" class="btn btn-outline-danger" onclick="return confirm('この案件を削除しますか？この操作は取り消せません。')">
+                            <i class="bi bi-trash"></i> 案件を削除
+                        </a>
+                            {% endif %}
+                        {% endif %}
                     {% endif %}
+                    {% if not user.is_viewer %}
                     <a href="{% url 'schedule:schedule_create' %}?project={{ project.pk }}" class="btn btn-outline-primary">
                         <i class="bi bi-calendar-plus"></i> スケジュール追加
                     </a>
+                    {% endif %}
                     {% if project.created_by == user or project.assigned_to == user or user.is_manager or user.is_superuser %}
-                        {% if project.is_completed %}
+                        {% if not user.is_viewer %}
+                            {% if project.is_completed %}
                             <a href="{% url 'schedule:project_complete' project.pk %}" class="btn btn-outline-warning">
                                 <i class="bi bi-arrow-clockwise"></i> 未完了に戻す
                             </a>
-                        {% else %}
+                            {% else %}
                             <a href="{% url 'schedule:project_complete' project.pk %}" class="btn btn-outline-success">
                                 <i class="bi bi-check-circle"></i> 完了にする
                             </a>
+                            {% endif %}
                         {% endif %}
                     {% endif %}
                     <a href="{% url 'schedule:calendar' %}" class="btn btn-outline-info">

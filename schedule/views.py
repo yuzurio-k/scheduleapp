@@ -8,6 +8,7 @@ from datetime import datetime, timedelta, date
 import calendar
 import json
 from django.utils import timezone
+from .forms import ProjectForm, ScheduleForm, FieldForm
 
 # 祝日ライブラリ（任意）
 try:
@@ -20,7 +21,7 @@ def require_manager(view_func):
     def wrapper(request, *args, **kwargs):
         if not request.user.is_manager and not request.user.is_superuser:
             messages.error(request, 'この機能を使用する権限がありません。')
-            return redirect('schedule:index')
+            return redirect('schedule:project_list')
         return view_func(request, *args, **kwargs)
     return wrapper
 
@@ -41,7 +42,7 @@ def index(request):
     ).select_related('project', 'field')
 
     # 権限に応じてフィルタリング
-    if not (user.is_manager or user.is_superuser):
+    if not (user.is_manager or user.is_superuser or user.is_viewer):
         today_schedules = today_schedules.filter(
             Q(project__created_by=user) | Q(project__assigned_to=user)
         )
@@ -54,7 +55,7 @@ def index(request):
             schedule.save()
 
     # 案件一覧（最新5件）
-    if user.is_manager or user.is_superuser:
+    if user.is_manager or user.is_superuser or user.is_viewer:
         projects = Project.objects.all().select_related('created_by', 'assigned_to').order_by('-created_at')[:5]
     else:
         projects = Project.objects.filter(
@@ -66,7 +67,7 @@ def index(request):
         start_date__lte=today + timedelta(days=7),
         end_date__gte=today - timedelta(days=7)
     ).select_related('project', 'field')
-    if not (user.is_manager or user.is_superuser):
+    if not (user.is_manager or user.is_superuser or user.is_viewer):
         recent_schedules = recent_schedules.filter(
             Q(project__created_by=user) | Q(project__assigned_to=user)
         )
@@ -83,13 +84,24 @@ def index(request):
 def project_list(request):
     """案件一覧"""
     if request.user.is_manager or request.user.is_superuser:
-        # マネージャーは全案件を表示
+        # マネージャーは全案件を表示（担当者フィルタがある場合は自分のみ）
         projects = Project.objects.all().select_related('created_by', 'assigned_to')
+        
+        # マネージャー向け担当者フィルタ
+        assignee_filter = request.GET.get('assignee', 'all')
+        if assignee_filter == 'me':
+            projects = projects.filter(assigned_to=request.user)
+        # 'all'の場合はフィルタしない（全員の案件を表示）
+    elif request.user.is_viewer:
+        # 閲覧者は全案件を表示（担当者フィルタは利用不可）
+        projects = Project.objects.all().select_related('created_by', 'assigned_to')
+        assignee_filter = 'all'  # 閲覧者には担当者フィルタは関係ない
     else:
         # 一般ユーザーは自分が作成または担当している案件のみ
         projects = Project.objects.filter(
             Q(created_by=request.user) | Q(assigned_to=request.user)
         ).select_related('created_by', 'assigned_to').distinct()
+        assignee_filter = 'all'  # 一般ユーザーには関係ない
     
     # 完了状態フィルタ（初期値は進行中）
     status_filter = request.GET.get('status', 'active')
@@ -99,66 +111,58 @@ def project_list(request):
         projects = projects.filter(is_completed=False)
     # 'all' の場合はフィルタしない
     
-    # ソート機能（マネージャーのみ）
+    # ソート機能
     sort_by = request.GET.get('sort', 'name')
-    if request.user.is_manager or request.user.is_superuser:
-        if sort_by == 'assigned_to':
-            projects = projects.order_by('assigned_to__last_name', 'assigned_to__first_name', 'assigned_to__username')
-        elif sort_by == 'created_by':
-            projects = projects.order_by('created_by__last_name', 'created_by__first_name', 'created_by__username')
-        elif sort_by == 'manufacturing_number':
-            projects = projects.order_by('manufacturing_number')
-        elif sort_by == 'due_date':
-            projects = projects.order_by('due_date')
-        elif sort_by == 'created_at':
-            projects = projects.order_by('-created_at')
-        elif sort_by == 'completed_at':
-            projects = projects.order_by('-completed_at')
-        else:
-            projects = projects.order_by('name')
+    if sort_by == 'assigned_to':
+        projects = projects.order_by('assigned_to__last_name', 'assigned_to__first_name', 'assigned_to__username')
+    elif sort_by == 'manufacturing_number':
+        projects = projects.order_by('manufacturing_number')
+    elif sort_by == 'due_date':
+        projects = projects.order_by('due_date')
+    elif sort_by == 'created_at':
+        projects = projects.order_by('-created_at')
+    elif sort_by == 'completed_at':
+        projects = projects.order_by('-completed_at')
     else:
         projects = projects.order_by('name')
+    
+    # 各プロジェクトに色情報と削除可否情報を追加
+    colors = ['#007bff', '#28a745', '#dc3545', '#ffc107', '#6f42c1', '#fd7e14', '#20c997', '#e83e8c', '#6c757d', '#17a2b8']
+    for project in projects:
+        assigned_color_index = (project.assigned_to.id % 10) if project.assigned_to else 0
+        
+        project.assigned_bg_color = colors[assigned_color_index]
+        project.assigned_text_color = '#212529' if assigned_color_index == 3 else '#ffffff'  # 黄色の場合は黒文字
     
     return render(request, 'schedule/project_list.html', {
         'projects': projects,
         'current_sort': sort_by,
         'current_status': status_filter,
+        'current_assignee': assignee_filter,
     })
 
 @login_required
 @never_cache
 def project_create(request):
     """案件作成"""
+    # 権限チェック（閲覧者は案件作成不可）
+    if request.user.is_viewer:
+        messages.error(request, '閲覧者権限では案件を作成できません。')
+        return redirect('schedule:project_list')
+    
     if request.method == 'POST':
-        name = request.POST.get('name')
-        description = request.POST.get('description', '')
-        manufacturing_number = request.POST.get('manufacturing_number', '')
-        due_date = request.POST.get('due_date')
-        assigned_to_id = request.POST.get('assigned_to')
-
-        if name and assigned_to_id:
-            try:
-                assigned_to = CustomUser.objects.get(id=assigned_to_id)
-                project = Project.objects.create(
-                    name=name,
-                    description=description,
-                    manufacturing_number=manufacturing_number,
-                    due_date=due_date if due_date else None,
-                    created_by=request.user,
-                    assigned_to=assigned_to
-                )
-                messages.success(request, f'案件「{project.name}」を作成しました。')
-                return redirect('schedule:project_detail', pk=project.pk)
-            except CustomUser.DoesNotExist:
-                messages.error(request, '担当者が見つかりません。')
-        else:
-            messages.error(request, '案件名と担当者は必須です。')
-
-    # ユーザー一覧を取得
-    users = CustomUser.objects.all().order_by('last_name', 'first_name', 'username')
+        form = ProjectForm(request.POST, user=request.user)
+        if form.is_valid():
+            project = form.save(commit=False)
+            project.created_by = request.user
+            project.save()
+            messages.success(request, f'案件「{project.name}」を作成しました。')
+            return redirect('schedule:project_detail', pk=project.pk)
+    else:
+        form = ProjectForm(user=request.user)
     
     return render(request, 'schedule/project_create.html', {
-        'users': users,
+        'form': form,
     })
 
 @login_required
@@ -167,8 +171,8 @@ def project_detail(request, pk):
     """案件詳細"""
     project = get_object_or_404(Project, pk=pk)
     
-    # 権限チェック（マネージャーまたは関係者のみ）
-    if not (request.user.is_manager or request.user.is_superuser or 
+    # 権限チェック（マネージャー、閲覧者または関係者のみ）
+    if not (request.user.is_manager or request.user.is_superuser or request.user.is_viewer or
             project.created_by == request.user or project.assigned_to == request.user):
         messages.error(request, 'この案件にアクセスする権限がありません。')
         return redirect('schedule:project_list')
@@ -194,41 +198,22 @@ def project_edit(request, pk):
     """案件編集"""
     project = get_object_or_404(Project, pk=pk)
     
-    # 権限チェック（マネージャーまたは作成者のみ）
-    if not (request.user.is_manager or request.user.is_superuser or project.created_by == request.user):
+    # 権限チェック（マネージャーまたは作成者のみ、閲覧者は編集不可）
+    if request.user.is_viewer or not (request.user.is_manager or request.user.is_superuser or project.created_by == request.user):
         messages.error(request, 'この案件を編集する権限がありません。')
         return redirect('schedule:project_detail', pk=project.pk)
     
     if request.method == 'POST':
-        name = request.POST.get('name')
-        description = request.POST.get('description', '')
-        manufacturing_number = request.POST.get('manufacturing_number', '')
-        due_date = request.POST.get('due_date')
-        assigned_to_id = request.POST.get('assigned_to')
-
-        if name and assigned_to_id:
-            try:
-                assigned_to = CustomUser.objects.get(id=assigned_to_id)
-                project.name = name
-                project.description = description
-                project.manufacturing_number = manufacturing_number
-                project.due_date = due_date if due_date else None
-                project.assigned_to = assigned_to
-                project.save()
-                
-                messages.success(request, f'案件「{project.name}」を更新しました。')
-                return redirect('schedule:project_detail', pk=project.pk)
-            except CustomUser.DoesNotExist:
-                messages.error(request, '担当者が見つかりません。')
-        else:
-            messages.error(request, '案件名と担当者は必須です。')
-
-    # ユーザー一覧を取得
-    users = CustomUser.objects.all().order_by('last_name', 'first_name', 'username')
+        form = ProjectForm(request.POST, instance=project, user=request.user)
+        if form.is_valid():
+            form.save()
+            messages.success(request, f'案件「{project.name}」を更新しました。')
+            return redirect('schedule:project_detail', pk=project.pk)
+    else:
+        form = ProjectForm(instance=project, user=request.user)
     
     return render(request, 'schedule/project_edit.html', {
-        'project': project,
-        'users': users,
+        'form': form,
     })
 
 @login_required
@@ -237,9 +222,14 @@ def project_delete(request, pk):
     """案件削除"""
     project = get_object_or_404(Project, pk=pk)
     
-    # 権限チェック（マネージャーまたは作成者のみ）
-    if not (request.user.is_manager or request.user.is_superuser or project.created_by == request.user):
+    # 権限チェック（マネージャーまたは作成者のみ、閲覧者は削除不可）
+    if request.user.is_viewer or not (request.user.is_manager or request.user.is_superuser or project.created_by == request.user):
         messages.error(request, 'この案件を削除する権限がありません。')
+        return redirect('schedule:project_detail', pk=project.pk)
+    
+    # スケジュール存在チェック
+    if project.has_schedules():
+        messages.error(request, 'スケジュールが登録されている案件は削除できません。')
         return redirect('schedule:project_detail', pk=project.pk)
     
     if request.method == 'POST':
@@ -297,9 +287,9 @@ def calendar_view(request):
             start_date__lte=week_end,
             end_date__gte=week_start
         ).select_related('project', 'project__created_by', 'project__assigned_to')\
-         .order_by('project__name', 'start_date')
+         .order_by('project__assigned_to__last_name', 'project__assigned_to__first_name', 'project__assigned_to__username', 'project__name', 'start_date')
 
-        if not (request.user.is_manager or request.user.is_superuser):
+        if not (request.user.is_manager or request.user.is_superuser or request.user.is_viewer):
             base_qs = base_qs.filter(Q(project__created_by=request.user) | Q(project__assigned_to=request.user))
 
         # ステータス更新
@@ -362,15 +352,31 @@ def calendar_view(request):
 
     base_qs = Schedule.objects.filter(start_date__lte=last_day, end_date__gte=first_day) \
         .select_related('project', 'project__created_by', 'project__assigned_to')\
-        .order_by('project__name', 'start_date')
-    if not (request.user.is_manager or request.user.is_superuser):
+        .order_by('project__assigned_to__last_name', 'project__assigned_to__first_name', 'project__assigned_to__username', 'project__name', 'start_date')
+    if not (request.user.is_manager or request.user.is_superuser or request.user.is_viewer):
         base_qs = base_qs.filter(Q(project__created_by=request.user) | Q(project__assigned_to=request.user))
 
+    # 担当者の色分け情報を追加
+    colors = ['#007bff', '#28a745', '#dc3545', '#ffc107', '#6f42c1', '#fd7e14', '#20c997', '#e83e8c', '#6c757d', '#17a2b8']
+    # 担当者の色分け情報を追加
+    colors = ['#007bff', '#28a745', '#dc3545', '#ffc107', '#6f42c1', '#fd7e14', '#20c997', '#e83e8c', '#6c757d', '#17a2b8']
     for s in base_qs:
         old = s.status
         s.update_status_by_date()
         if old != s.status:
             s.save()
+        
+        # 担当者の色情報を追加
+        if s.project.assigned_to:
+            assigned_color_index = (s.project.assigned_to.id % 10)
+            s.assigned_bg_color = colors[assigned_color_index]
+            s.assigned_text_color = '#212529' if assigned_color_index == 3 else '#ffffff'  # 黄色の場合は黒文字
+        
+        # 担当者の色情報を追加
+        if s.project.assigned_to:
+            assigned_color_index = (s.project.assigned_to.id % 10)
+            s.assigned_bg_color = colors[assigned_color_index]
+            s.assigned_text_color = '#212529' if assigned_color_index == 3 else '#ffffff'  # 黄色の場合は黒文字
 
     cal = calendar.Calendar(firstweekday=6)  # 日曜始まり
     weeks = []
@@ -448,6 +454,11 @@ def schedule_api(request):
 @never_cache
 def schedule_create(request):
     """スケジュール作成"""
+    # 権限チェック（閲覧者はスケジュール作成不可）
+    if request.user.is_viewer:
+        messages.error(request, '閲覧者権限ではスケジュールを作成できません。')
+        return redirect('schedule:project_list')
+    
     project_id = request.GET.get('project')
     
     if request.method == 'POST':
@@ -462,8 +473,13 @@ def schedule_create(request):
                 project = Project.objects.get(id=project_id)
                 field = Field.objects.get(id=field_id)
                 
-                # 権限チェック
-                if not (request.user.is_manager or request.user.is_superuser or 
+                # 日付文字列をdateオブジェクトに変換
+                from datetime import datetime
+                start_date_obj = datetime.strptime(start_date, '%Y-%m-%d').date()
+                end_date_obj = datetime.strptime(end_date, '%Y-%m-%d').date()
+                
+                # 権限チェック（閲覧者はスケジュール追加不可）
+                if request.user.is_viewer or not (request.user.is_manager or request.user.is_superuser or 
                         project.created_by == request.user or project.assigned_to == request.user):
                     messages.error(request, 'この案件にスケジュールを追加する権限がありません。')
                     return redirect('schedule:project_detail', pk=project.pk)
@@ -471,8 +487,8 @@ def schedule_create(request):
                 schedule = Schedule.objects.create(
                     project=project,
                     field=field,
-                    start_date=start_date,
-                    end_date=end_date,
+                    start_date=start_date_obj,
+                    end_date=end_date_obj,
                     description=description
                 )
                 
@@ -481,9 +497,11 @@ def schedule_create(request):
                 schedule.save()
                 
                 messages.success(request, f'スケジュール「{schedule.field.name}」を作成しました。')
-                return redirect('schedule:schedule_detail', pk=schedule.pk)
+                return redirect('schedule:project_detail', pk=project.pk)
             except (Project.DoesNotExist, Field.DoesNotExist):
                 messages.error(request, '案件または分野が見つかりません。')
+            except ValueError:
+                messages.error(request, '日付の形式が正しくありません。')
         else:
             messages.error(request, '全ての必須項目を入力してください。')
 
@@ -505,10 +523,11 @@ def schedule_create(request):
         except Project.DoesNotExist:
             pass
 
-    return render(request, 'schedule/schedule_create.html', {
+    return render(request, 'schedule/schedule_form.html', {
         'projects': projects,
         'fields': fields,
         'selected_project': selected_project,
+        'title': 'スケジュール作成',
     })
 
 @login_required
@@ -539,8 +558,8 @@ def schedule_edit(request, pk):
     """スケジュール編集"""
     schedule = get_object_or_404(Schedule, pk=pk)
     
-    # 権限チェック（マネージャーまたは関係者のみ）
-    if not (request.user.is_manager or request.user.is_superuser or 
+    # 権限チェック（マネージャーまたは関係者のみ、閲覧者は編集不可）
+    if request.user.is_viewer or not (request.user.is_manager or request.user.is_superuser or 
             schedule.project.created_by == request.user or schedule.project.assigned_to == request.user):
         messages.error(request, 'このスケジュールを編集する権限がありません。')
         return redirect('schedule:schedule_detail', pk=schedule.pk)
@@ -583,8 +602,8 @@ def schedule_delete(request, pk):
     """スケジュール削除"""
     schedule = get_object_or_404(Schedule, pk=pk)
     
-    # 権限チェック（マネージャーまたは関係者のみ）
-    if not (request.user.is_manager or request.user.is_superuser or 
+    # 権限チェック（マネージャーまたは関係者のみ、閲覧者は削除不可）
+    if request.user.is_viewer or not (request.user.is_manager or request.user.is_superuser or 
             schedule.project.created_by == request.user or schedule.project.assigned_to == request.user):
         messages.error(request, 'このスケジュールを削除する権限がありません。')
         return redirect('schedule:schedule_detail', pk=schedule.pk)
@@ -661,3 +680,29 @@ def field_delete_view(request, field_id):
         return redirect('schedule:field_list')
     
     return render(request, 'schedule/field_confirm_delete.html', {'field': field})
+
+@login_required
+@never_cache
+def schedule_complete_view(request, schedule_id):
+    """スケジュール完了/未完了切替"""
+    schedule = get_object_or_404(Schedule, id=schedule_id)
+    
+    # 権限チェック（マネージャーまたは関係者のみ）
+    if not (request.user.is_manager or request.user.is_superuser or 
+            schedule.project.created_by == request.user or schedule.project.assigned_to == request.user):
+        messages.error(request, 'このスケジュールの完了状態を変更する権限がありません。')
+        return redirect('schedule:project_detail', pk=schedule.project.pk)
+    
+    # スケジュールの状態を切替
+    if schedule.status == 'completed':
+        schedule.status = 'pending'  # または 'in_progress'
+        schedule.completed_at = None
+        action = '未完了に戻し'
+    else:
+        schedule.status = 'completed'
+        schedule.completed_at = timezone.now()
+        action = '完了に設定'
+    
+    schedule.save()
+    messages.success(request, f'スケジュール「{schedule.field.name}」を{action}ました。')
+    return redirect('schedule:project_detail', pk=schedule.project.pk)

@@ -46,6 +46,15 @@ class Project(models.Model):
         else:
             self.is_completed = True
             self.completed_at = timezone.now()
+        self.save()
+    
+    def has_schedules(self):
+        """スケジュールが存在するかどうかを返す"""
+        return self.schedule_set.exists()
+    
+    def can_be_deleted(self):
+        """削除可能かどうかを返す（スケジュールが存在しない場合のみ削除可能）"""
+        return not self.has_schedules()
 
 
 class Schedule(models.Model):

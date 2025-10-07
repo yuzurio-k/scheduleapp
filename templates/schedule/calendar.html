@@ -186,9 +186,6 @@
                               {% endif %}
                               <span>{{ schedule.project.name|truncatechars:14 }}</span>
                               {% if schedule.status == 'completed' %}<span class="text-success">✓</span>{% endif %}
-                              {% if user.is_manager or user.is_superuser %}
-                                <br><small class="text-muted">{% if schedule.project.assigned_to.first_name or schedule.project.assigned_to.last_name %}{{ schedule.project.assigned_to.last_name }} {{ schedule.project.assigned_to.first_name }}{% else %}{{ schedule.project.assigned_to.username }}{% endif %}</small>
-                              {% endif %}
                             </div>
                           </div>
                         {% endfor %}
@@ -228,7 +225,7 @@
                   <th>案件名</th>
                   <th>製番</th>
                   <th>分野</th>
-                  {% if user.is_manager or user.is_superuser %}<th>担当者</th>{% endif %}
+                  <th>担当者</th>
                   <th>期間</th>
                   <th>詳細</th>
                 </tr>
@@ -255,9 +252,7 @@
                       <span class="badge bg-secondary">{{ schedule.field.name }}</span>
                     {% endif %}
                   </td>
-                  {% if user.is_manager or user.is_superuser %}
-                    <td><span class="badge bg-info">{% if schedule.project.assigned_to.first_name or schedule.project.assigned_to.last_name %}{{ schedule.project.assigned_to.last_name }} {{ schedule.project.assigned_to.first_name }}{% else %}{{ schedule.project.assigned_to.username }}{% endif %}</span></td>
-                  {% endif %}
+                  <td><span class="badge" style="background-color: {{ schedule.assigned_bg_color }}; color: {{ schedule.assigned_text_color }};">{% if schedule.project.assigned_to.first_name or schedule.project.assigned_to.last_name %}{{ schedule.project.assigned_to.last_name }} {{ schedule.project.assigned_to.first_name }}{% else %}{{ schedule.project.assigned_to.username }}{% endif %}</span></td>
                   <td>{{ schedule.start_date|date:"m/d" }} ～ {{ schedule.end_date|date:"m/d" }} ({{ schedule.duration_days }}日)</td>
                   <td>{{ schedule.description|default:"-"|truncatechars:50 }}</td>
                 </tr>
