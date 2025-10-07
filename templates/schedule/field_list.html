@@ -1,0 +1,75 @@
+{% extends 'base.html' %}
+
+{% block title %}分野管理 - Schedule App{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2>分野管理</h2>
+                <a href="{% url 'schedule:field_create' %}" class="btn btn-primary">
+                    <i class="fas fa-plus"></i> 分野追加
+                </a>
+            </div>
+            
+            {% if messages %}
+                {% for message in messages %}
+                    <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+            
+            <div class="card">
+                <div class="card-body">
+                    {% if fields %}
+                        <div class="table-responsive">
+                            <table class="table table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>分野名</th>
+                                        <th>登録者</th>
+                                        <th>登録日時</th>
+                                        <th>操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for field in fields %}
+                                    <tr>
+                                        <td>{{ field.name }}</td>
+                                        <td>{% if field.created_by.first_name or field.created_by.last_name %}{{ field.created_by.last_name }} {{ field.created_by.first_name }}{% else %}{{ field.created_by.username }}{% endif %}</td>
+                                        <td>{{ field.created_at|date:"Y年m月d日 H:i" }}</td>
+                                        <td>
+                                            {% if user.is_manager or user.is_superuser %}
+                                                <a href="{% url 'schedule:field_delete' field.id %}" 
+                                                   class="btn btn-sm btn-outline-danger"
+                                                   onclick="return confirm('この分野を削除しますか？')">
+                                                    <i class="fas fa-trash"></i> 削除
+                                                </a>
+                                            {% else %}
+                                                <span class="text-muted">-</span>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="text-center py-5">
+                            <i class="fas fa-folder-open fa-3x text-muted mb-3"></i>
+                            <h5 class="text-muted">分野が登録されていません</h5>
+                            <p class="text-muted">新しい分野を追加してください。</p>
+                            <a href="{% url 'schedule:field_create' %}" class="btn btn-primary">
+                                <i class="fas fa-plus"></i> 分野追加
+                            </a>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

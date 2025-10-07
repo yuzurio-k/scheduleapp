@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+
+{% block title %}案件完了確認 - {{ block.super }}{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-6 mx-auto">
+        <div class="card">
+            <div class="card-header">
+                <h4 class="card-title mb-0">
+                    <i class="bi bi-check-circle"></i> 案件完了確認
+                </h4>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-warning">
+                    <h5>{{ project.name }}</h5>
+                    <p class="mb-0">製造番号: {{ project.manufacturing_number }}</p>
+                    {% if project.is_completed %}
+                        <p class="mt-2">この案件を<strong>未完了状態</strong>に戻しますか？</p>
+                    {% else %}
+                        <p class="mt-2">この案件を<strong>完了</strong>にしますか？</p>
+                    {% endif %}
+                </div>
+                
+                <form method="post">
+                    {% csrf_token %}
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                        <a href="{% url 'schedule:project_detail' project.pk %}" class="btn btn-secondary me-md-2">
+                            <i class="bi bi-x-circle"></i> キャンセル
+                        </a>
+                        {% if project.is_completed %}
+                            <button type="submit" class="btn btn-warning">
+                                <i class="bi bi-arrow-clockwise"></i> 未完了に戻す
+                            </button>
+                        {% else %}
+                            <button type="submit" class="btn btn-success">
+                                <i class="bi bi-check-circle"></i> 完了にする
+                            </button>
+                        {% endif %}
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

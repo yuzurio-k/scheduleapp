@@ -1,0 +1,311 @@
+from django.shortcuts import render, redirect, get_object_or_404
+from django.contrib.auth.decorators import login_required
+from django.contrib import messages
+from django.http import JsonResponse
+from django.db.models import Q
+from django.views.decorators.cache import never_cache
+from datetime import datetime, timedelta
+import calendar
+import json
+from django.utils import timezone
+
+# マネージャー権限チェックデコレーター
+def require_manager(view_func):
+    def wrapper(request, *args, **kwargs):
+        if not request.user.is_manager and not request.user.is_superuser:
+            messages.error(request, 'この機能を使用する権限がありません。')
+            return redirect('schedule:index')
+        return view_func(request, *args, **kwargs)
+    return wrapper
+
+from .models import Project, Schedule, Field
+from .forms import ProjectForm, ScheduleForm, FieldForm
+
+@login_required
+@never_cache
+def schedule_complete_view(request, schedule_id):
+    """スケジュール完了"""
+    schedule = get_object_or_404(Schedule, id=schedule_id, project__created_by=request.user)
+    
+    if request.method == 'POST':
+        schedule.status = 'completed'
+        schedule.completed_at = timezone.now()
+        schedule.save()
+        messages.success(request, 'スケジュールを完了にしました。')
+        return redirect('schedule:project_detail', pk=schedule.project.id)
+    
+    return render(request, 'schedule/schedule_confirm_complete.html', {'schedule': schedule})
+from datetime import datetime, timedelta
+import calendar
+import json
+
+# マネージャー権限チェックデコレーター
+def require_manager(view_func):
+    def wrapper(request, *args, **kwargs):
+        if not request.user.is_manager and not request.user.is_superuser:
+            messages.error(request, 'この機能を使用する権限がありません。')
+            return redirect('schedule:index')
+        return view_func(request, *args, **kwargs)
+    return wrapper
+
+from .models import Project, Schedule, Field
+from .forms import ProjectForm, ScheduleForm, FieldForm
+
+@login_required
+@never_cache
+def home(request):
+    """ホーム画面"""
+    if request.user.is_manager or request.user.is_superuser:
+        projects = Project.objects.all().select_related('created_by', 'assigned_to')
+        recent_schedules = Schedule.objects.all().select_related('project').order_by('-created_at')[:5]
+    else:
+        projects = Project.objects.filter(
+            Q(created_by=request.user) | Q(assigned_to=request.user)
+        ).select_related('created_by', 'assigned_to').distinct()
+        recent_schedules = Schedule.objects.filter(
+            Q(project__created_by=request.user) | Q(project__assigned_to=request.user)
+        ).select_related('project').distinct().order_by('-created_at')[:5]
+    
+    context = {
+        'projects': projects,
+        'recent_schedules': recent_schedules,
+    }
+    return render(request, 'schedule/home.html', context)
+
+@login_required
+@never_cache
+def project_list(request):
+    """案件一覧"""
+    if request.user.is_manager or request.user.is_superuser:
+        # マネージャーは全案件を表示
+        projects = Project.objects.all().select_related('created_by', 'assigned_to')
+    else:
+        # 一般ユーザーは自分が作成または担当している案件のみ
+        projects = Project.objects.filter(
+            Q(created_by=request.user) | Q(assigned_to=request.user)
+        ).select_related('created_by', 'assigned_to').distinct()
+    
+    return render(request, 'schedule/project_list.html', {'projects': projects})
+
+@login_required
+def project_create(request):
+    """案件作成"""
+    if request.method == 'POST':
+        form = ProjectForm(request.POST, user=request.user)
+        if form.is_valid():
+            project = form.save(commit=False)
+            project.created_by = request.user
+            project.save()
+            messages.success(request, '案件が作成されました。')
+            return redirect('schedule:project_list')
+    else:
+        form = ProjectForm(user=request.user)
+    
+    return render(request, 'schedule/project_form.html', {'form': form, 'title': '案件作成'})
+
+@login_required
+@never_cache
+def project_detail(request, pk):
+    """案件詳細"""
+    project = get_object_or_404(Project, pk=pk, created_by=request.user)
+    schedules = Schedule.objects.filter(project=project).order_by('start_date')
+    return render(request, 'schedule/project_detail.html', {
+        'project': project,
+        'schedules': schedules,
+    })
+
+@login_required
+@never_cache
+def project_edit(request, pk):
+    """案件編集"""
+    project = get_object_or_404(Project, pk=pk)
+    
+    # 権限チェック：作成者かマネージャーのみ編集可能
+    if not (request.user == project.created_by or request.user.is_manager or request.user.is_superuser):
+        messages.error(request, 'この案件を編集する権限がありません。')
+        return redirect('schedule:project_detail', pk=pk)
+    
+    if request.method == 'POST':
+        form = ProjectForm(request.POST, instance=project, user=request.user)
+        if form.is_valid():
+            form.save()
+            messages.success(request, '案件が更新されました。')
+            return redirect('schedule:project_detail', pk=pk)
+    else:
+        form = ProjectForm(instance=project, user=request.user)
+    
+    return render(request, 'schedule/project_form.html', {'form': form, 'title': '案件編集', 'project': project})
+
+@login_required
+def schedule_create(request):
+    """スケジュール作成"""
+    if request.method == 'POST':
+        form = ScheduleForm(request.POST)
+        if form.is_valid():
+            schedule = form.save()
+            messages.success(request, 'スケジュールが作成されました。')
+            return redirect('schedule:project_detail', pk=schedule.project.pk)
+    else:
+        form = ScheduleForm()
+        # ユーザーの案件のみ選択できるようにする
+        form.fields['project'].queryset = Project.objects.filter(created_by=request.user)
+    
+    return render(request, 'schedule/schedule_form.html', {'form': form, 'title': 'スケジュール作成'})
+
+@login_required
+@never_cache
+def calendar_view(request):
+    """カレンダー表示"""
+    # 現在の年月を取得
+    year = int(request.GET.get('year', datetime.now().year))
+    month = int(request.GET.get('month', datetime.now().month))
+    
+    # 月の最初と最後の日を取得
+    first_day = datetime(year, month, 1).date()
+    if month == 12:
+        last_day = datetime(year + 1, 1, 1).date() - timedelta(days=1)
+    else:
+        last_day = datetime(year, month + 1, 1).date() - timedelta(days=1)
+    
+    # 該当月のスケジュールを取得
+    schedules = Schedule.objects.filter(
+        project__created_by=request.user,
+        start_date__lte=last_day,
+        end_date__gte=first_day
+    ).select_related('project')
+    
+    # カレンダーデータを作成
+    cal = calendar.Calendar(firstweekday=6)  # 日曜日始まり
+    month_days = cal.monthdayscalendar(year, month)
+    
+    # 前月・次月の計算
+    prev_month = month - 1 if month > 1 else 12
+    prev_year = year if month > 1 else year - 1
+    next_month = month + 1 if month < 12 else 1
+    next_year = year if month < 12 else year + 1
+    
+    context = {
+        'year': year,
+        'month': month,
+        'month_name': calendar.month_name[month],
+        'month_days': month_days,
+        'schedules': schedules,
+        'prev_year': prev_year,
+        'prev_month': prev_month,
+        'next_year': next_year,
+        'next_month': next_month,
+    }
+    
+    return render(request, 'schedule/calendar.html', context)
+
+@login_required
+def schedule_api(request):
+    """スケジュールAPI（カレンダー用）"""
+    schedules = Schedule.objects.filter(
+        project__created_by=request.user
+    ).select_related('project')
+    
+    events = []
+    for schedule in schedules:
+        events.append({
+            'title': f'{schedule.project.name} - {schedule.field.name}',
+            'start': schedule.start_date.isoformat(),
+            'end': schedule.end_date.isoformat(),
+            'description': schedule.description,
+            'project': schedule.project.name,
+            'field': schedule.field.name,
+        })
+    
+    return JsonResponse(events, safe=False)
+
+# 分野管理ビュー
+@login_required
+@never_cache
+def field_list_view(request):
+    """分野一覧表示"""
+    fields = Field.objects.all().order_by('name')
+    return render(request, 'schedule/field_list.html', {'fields': fields})
+
+@login_required
+@never_cache
+def field_create_view(request):
+    """分野作成"""
+    if request.method == 'POST':
+        form = FieldForm(request.POST)
+        if form.is_valid():
+            field = form.save(commit=False)
+            field.created_by = request.user
+            field.save()
+            messages.success(request, '分野を作成しました。')
+            return redirect('schedule:field_list')
+    else:
+        form = FieldForm()
+    
+    return render(request, 'schedule/field_form.html', {'form': form, 'title': '分野作成'})
+
+@login_required
+@never_cache
+@require_manager
+def field_delete_view(request, field_id):
+    """分野削除（マネージャーのみ）"""
+    field = get_object_or_404(Field, id=field_id)
+    
+    # 使用中の分野は削除できない
+    if Schedule.objects.filter(field=field).exists():
+        messages.error(request, 'この分野は使用中のため削除できません。')
+        return redirect('schedule:field_list')
+    
+    if request.method == 'POST':
+        field.delete()
+        messages.success(request, '分野を削除しました。')
+        return redirect('schedule:field_list')
+    
+    return render(request, 'schedule/field_confirm_delete.html', {'field': field})
+
+# スケジュール管理ビュー
+@login_required
+@never_cache
+def schedule_complete_view(request, schedule_id):
+    """スケジュール完了"""
+    schedule = get_object_or_404(Schedule, id=schedule_id, project__created_by=request.user)
+    
+    if request.method == 'POST':
+        # 完了フラグを追加する場合は、ここでモデルを更新
+        # 現在は削除で完了とする
+        schedule.delete()
+        messages.success(request, 'スケジュールを完了しました。')
+        return redirect('schedule:home')
+    
+    return render(request, 'schedule/schedule_confirm_complete.html', {'schedule': schedule})
+
+@login_required
+@never_cache
+def schedule_edit_view(request, schedule_id):
+    """スケジュール編集"""
+    schedule = get_object_or_404(Schedule, id=schedule_id, project__created_by=request.user)
+    
+    if request.method == 'POST':
+        form = ScheduleForm(request.POST, instance=schedule)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'スケジュールを更新しました。')
+            return redirect('schedule:home')
+    else:
+        form = ScheduleForm(instance=schedule)
+        # ユーザーの案件のみ選択できるようにする
+        form.fields['project'].queryset = Project.objects.filter(created_by=request.user)
+    
+    return render(request, 'schedule/schedule_form.html', {'form': form, 'title': 'スケジュール編集', 'schedule': schedule})
+
+@login_required
+@never_cache
+def schedule_delete_view(request, schedule_id):
+    """スケジュール削除"""
+    schedule = get_object_or_404(Schedule, id=schedule_id, project__created_by=request.user)
+    
+    if request.method == 'POST':
+        schedule.delete()
+        messages.success(request, 'スケジュールを削除しました。')
+        return redirect('schedule:home')
+    
+    return render(request, 'schedule/schedule_confirm_delete.html', {'schedule': schedule})

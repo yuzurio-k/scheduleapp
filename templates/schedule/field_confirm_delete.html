@@ -1,0 +1,52 @@
+{% extends 'base.html' %}
+
+{% block title %}分野削除確認 - Schedule App{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header bg-danger text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-exclamation-triangle"></i> 分野削除確認
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-warning">
+                        <i class="fas fa-exclamation-circle"></i>
+                        以下の分野を削除してもよろしいですか？
+                    </div>
+                    
+                    <div class="mb-3">
+                        <strong>分野名:</strong> {{ field.name }}
+                    </div>
+                    <div class="mb-3">
+                        <strong>登録者:</strong> {% if field.created_by.first_name or field.created_by.last_name %}{{ field.created_by.last_name }} {{ field.created_by.first_name }}{% else %}{{ field.created_by.username }}{% endif %}
+                    </div>
+                    <div class="mb-3">
+                        <strong>登録日時:</strong> {{ field.created_at|date:"Y年m月d日 H:i" }}
+                    </div>
+                    
+                    <div class="alert alert-danger">
+                        <i class="fas fa-info-circle"></i>
+                        <strong>注意:</strong> この操作は取り消すことができません。
+                    </div>
+                    
+                    <form method="post" class="d-inline">
+                        {% csrf_token %}
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                            <a href="{% url 'schedule:field_list' %}" class="btn btn-outline-secondary">
+                                <i class="fas fa-arrow-left"></i> キャンセル
+                            </a>
+                            <button type="submit" class="btn btn-danger">
+                                <i class="fas fa-trash"></i> 削除実行
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

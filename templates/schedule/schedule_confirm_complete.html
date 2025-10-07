@@ -1,0 +1,75 @@
+{% extends 'base.html' %}
+
+{% block title %}スケジュール完了確認 - Schedule App{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0">
+                        <i class="bi bi-check-circle"></i> スケジュール完了確認
+                    </h5>
+                </div>
+                <div class="card-body">
+                                        {% if schedule.status == 'completed' %}
+                        <div class="alert alert-warning">
+                            <i class="bi bi-arrow-counterclockwise"></i>
+                            以下のスケジュールの完了状態を解除してもよろしいですか？
+                        </div>
+                    {% else %}
+                        <div class="alert alert-success">
+                            <i class="bi bi-check-circle"></i>
+                            以下のスケジュールを完了状態にしてもよろしいですか？
+                        </div>
+                    {% endif %}
+                    
+                    <div class="mb-3">
+                        <strong>案件名:</strong> {{ schedule.project.name }}
+                    </div>
+                    <div class="mb-3">
+                        <strong>分野:</strong> 
+                        <span class="badge bg-primary">{{ schedule.field.name }}</span>
+                    </div>
+                    <div class="mb-3">
+                        <strong>期間:</strong> {{ schedule.start_date|date:"Y/m/d" }} ～ {{ schedule.end_date|date:"Y/m/d" }} ({{ schedule.duration_days }}日間)
+                    </div>
+                    {% if schedule.description %}
+                    <div class="mb-3">
+                        <strong>詳細:</strong> {{ schedule.description }}
+                    </div>
+                    {% endif %}
+                    
+                                                            <div class="alert alert-info">
+                        <i class="bi bi-info-circle"></i>
+                        {% if schedule.status == 'completed' %}
+                            <strong>注意:</strong> 完了解除後は、スケジュールの期間に応じて「予定」または「進行中」状態になります。
+                        {% else %}
+                            <strong>注意:</strong> 完了後も再度このボタンで完了状態を解除できます。
+                        {% endif %}
+                    </div>
+                    
+                    <form method="post" class="d-inline">
+                        {% csrf_token %}
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                            <a href="{% url 'schedule:project_detail' schedule.project.pk %}" class="btn btn-outline-secondary">
+                                <i class="bi bi-arrow-left"></i> キャンセル
+                            </a>
+                                                        {% if schedule.status == 'completed' %}
+                                <button type="submit" class="btn btn-warning">
+                                    <i class="bi bi-arrow-counterclockwise"></i> 完了解除
+                                </button>
+                            {% else %}
+                                <button type="submit" class="btn btn-success">
+                                    <i class="bi bi-check-circle"></i> 完了実行
+                                </button>
+                            {% endif %}
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

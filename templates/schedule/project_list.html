@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+
+{% block title %}案件一覧 - {{ block.super }}{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1>
+                <i class="bi bi-folder"></i> 案件一覧
+            </h1>
+            <a href="{% url 'schedule:project_create' %}" class="btn btn-primary">
+                <i class="bi bi-plus-circle"></i> 新しい案件
+            </a>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-body">
+                {% if projects %}
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">状態フィルタ:</label>
+                            <div class="btn-group" role="group">
+                                <a href="?status=all{% if current_sort != 'name' %}&sort={{ current_sort }}{% endif %}" class="btn {% if current_status == 'all' %}btn-primary{% else %}btn-outline-primary{% endif %} btn-sm">全て</a>
+                                <a href="?status=active{% if current_sort != 'name' %}&sort={{ current_sort }}{% endif %}" class="btn {% if current_status == 'active' %}btn-primary{% else %}btn-outline-primary{% endif %} btn-sm">進行中</a>
+                                <a href="?status=completed{% if current_sort != 'name' %}&sort={{ current_sort }}{% endif %}" class="btn {% if current_status == 'completed' %}btn-primary{% else %}btn-outline-primary{% endif %} btn-sm">完了</a>
+                            </div>
+                        </div>
+                        {% if user.is_manager or user.is_superuser %}
+                        <div class="col-md-6">
+                            <label class="form-label">ソート順:</label>
+                            <div class="btn-group" role="group">
+                                <a href="?sort=name{% if current_status != 'all' %}&status={{ current_status }}{% endif %}" class="btn {% if current_sort == 'name' %}btn-primary{% else %}btn-outline-primary{% endif %} btn-sm">案件名</a>
+                                <a href="?sort=manufacturing_number{% if current_status != 'all' %}&status={{ current_status }}{% endif %}" class="btn {% if current_sort == 'manufacturing_number' %}btn-primary{% else %}btn-outline-primary{% endif %} btn-sm">製造番号</a>
+                                <a href="?sort=due_date{% if current_status != 'all' %}&status={{ current_status }}{% endif %}" class="btn {% if current_sort == 'due_date' %}btn-primary{% else %}btn-outline-primary{% endif %} btn-sm">納期</a>
+                                <a href="?sort=assigned_to{% if current_status != 'all' %}&status={{ current_status }}{% endif %}" class="btn {% if current_sort == 'assigned_to' %}btn-primary{% else %}btn-outline-primary{% endif %} btn-sm">担当者</a>
+                                <a href="?sort=created_by{% if current_status != 'all' %}&status={{ current_status }}{% endif %}" class="btn {% if current_sort == 'created_by' %}btn-primary{% else %}btn-outline-primary{% endif %} btn-sm">登録者</a>
+                                <a href="?sort=created_at{% if current_status != 'all' %}&status={{ current_status }}{% endif %}" class="btn {% if current_sort == 'created_at' %}btn-primary{% else %}btn-outline-primary{% endif %} btn-sm">作成日</a>
+                                <a href="?sort=completed_at{% if current_status != 'all' %}&status={{ current_status }}{% endif %}" class="btn {% if current_sort == 'completed_at' %}btn-primary{% else %}btn-outline-primary{% endif %} btn-sm">完了日</a>
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>案件名</th>
+                                    <th>製造番号</th>
+                                    <th>納期</th>
+                                    <th>状態</th>
+                                    {% if current_status == 'completed' %}
+                                    <th>完了日</th>
+                                    {% endif %}
+                                    <th>登録者</th>
+                                    <th>担当者</th>
+                                    <th>作成日</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for project in projects %}
+                                <tr>
+                                    <td>
+                                        <a href="{% url 'schedule:project_detail' project.pk %}" class="text-decoration-none fw-bold">
+                                            {{ project.name }}
+                                        </a>
+                                    </td>
+                                    <td>{{ project.manufacturing_number }}</td>
+                                    <td>
+                                        {% if project.due_date %}
+                                            <span class="badge bg-warning text-dark">{{ project.due_date|date:"m/d" }}</span>
+                                        {% else %}
+                                            <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if project.is_completed %}
+                                            <span class="badge bg-success">完了</span>
+                                        {% else %}
+                                            <span class="badge bg-primary">進行中</span>
+                                        {% endif %}
+                                    </td>
+                                    {% if current_status == 'completed' %}
+                                    <td>
+                                        {% if project.completed_at %}
+                                            <span class="badge bg-success">{{ project.completed_at|date:"Y/m/d" }}</span>
+                                        {% else %}
+                                            <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                    {% endif %}
+                                    <td>
+                                        <span class="badge bg-info">{% if project.created_by.first_name or project.created_by.last_name %}{{ project.created_by.last_name }} {{ project.created_by.first_name }}{% else %}{{ project.created_by.username }}{% endif %}</span>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-success">{% if project.assigned_to.first_name or project.assigned_to.last_name %}{{ project.assigned_to.last_name }} {{ project.assigned_to.first_name }}{% else %}{{ project.assigned_to.username }}{% endif %}</span>
+                                    </td>
+                                    <td>{{ project.created_at|date:"Y/m/d" }}</td>
+                                    <td>
+                                        <div class="btn-group btn-group-sm">
+                                            <a href="{% url 'schedule:project_detail' project.pk %}" class="btn btn-outline-primary">
+                                                詳細
+                                            </a>
+                                            {% if project.created_by == user or user.is_manager or user.is_superuser %}
+                                            <a href="{% url 'schedule:project_edit' project.pk %}" class="btn btn-outline-secondary">
+                                                編集
+                                            </a>
+                                            {% endif %}
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="text-center py-5">
+                        <i class="bi bi-folder-x display-1 text-muted"></i>
+                        <h3 class="text-muted mt-3">案件がありません</h3>
+                        <p class="text-muted">まずは最初の案件を作成してみましょう。</p>
+                        <a href="{% url 'schedule:project_create' %}" class="btn btn-primary">
+                            <i class="bi bi-plus-circle"></i> 案件を作成
+                        </a>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

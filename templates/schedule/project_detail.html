@@ -1,0 +1,248 @@
+{% extends "base.html" %}
+
+{% block title %}{{ project.name }} - 詳細 - {{ block.super }}{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h4 class="card-title mb-0">
+                        <i class="bi bi-folder"></i> {{ project.name }}
+                        {% if project.is_completed %}
+                            <span class="badge bg-success ms-2">完了</span>
+                        {% endif %}
+                    </h4>
+                    <div class="d-flex gap-2">
+                        {% if project.created_by == user or project.assigned_to == user or user.is_manager or user.is_superuser %}
+                            {% if project.is_completed %}
+                                <a href="{% url 'schedule:project_complete' project.pk %}" class="btn btn-outline-warning btn-sm">
+                                    <i class="bi bi-arrow-clockwise"></i> 未完了に戻す
+                                </a>
+                            {% else %}
+                                <a href="{% url 'schedule:project_complete' project.pk %}" class="btn btn-outline-success btn-sm">
+                                    <i class="bi bi-check-circle"></i> 完了にする
+                                </a>
+                            {% endif %}
+                        {% endif %}
+                        <a href="{% url 'schedule:schedule_create' %}?project={{ project.pk }}" class="btn btn-outline-primary btn-sm">
+                            <i class="bi bi-calendar-plus"></i> スケジュール追加
+                        </a>
+                    </div>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="row mb-3">
+                    <div class="col-sm-3"><strong>製造番号:</strong></div>
+                    <div class="col-sm-9">{{ project.manufacturing_number }}</div>
+                </div>
+                
+                <div class="row mb-3">
+                    <div class="col-sm-3"><strong>納期:</strong></div>
+                    <div class="col-sm-9">
+                        {% if project.due_date %}
+                            <span class="badge bg-warning text-dark">{{ project.due_date|date:"Y年m月d日" }}</span>
+                        {% else %}
+                            <span class="text-muted">未設定</span>
+                        {% endif %}
+                    </div>
+                </div>
+                
+                <div class="row mb-3">
+                    <div class="col-sm-3"><strong>登録者:</strong></div>
+                    <div class="col-sm-9">
+                        <span class="badge bg-info">{% if project.created_by.first_name or project.created_by.last_name %}{{ project.created_by.last_name }} {{ project.created_by.first_name }}{% else %}{{ project.created_by.username }}{% endif %}</span>
+                        {% if project.created_by.first_name or project.created_by.last_name %}
+                        <small class="text-muted ms-2">{{ project.created_by.last_name }} {{ project.created_by.first_name }}</small>
+                        {% endif %}
+                    </div>
+                </div>
+                
+                <div class="row mb-3">
+                    <div class="col-sm-3"><strong>担当者:</strong></div>
+                    <div class="col-sm-9">
+                        <span class="badge bg-success">{% if project.assigned_to.first_name or project.assigned_to.last_name %}{{ project.assigned_to.last_name }} {{ project.assigned_to.first_name }}{% else %}{{ project.assigned_to.username }}{% endif %}</span>
+                        {% if project.assigned_to.first_name or project.assigned_to.last_name %}
+                        <small class="text-muted ms-2">{{ project.assigned_to.last_name }} {{ project.assigned_to.first_name }}</small>
+                        {% endif %}
+                    </div>
+                </div>
+                
+                {% if project.description %}
+                <div class="row mb-3">
+                    <div class="col-sm-3"><strong>詳細:</strong></div>
+                    <div class="col-sm-9">{{ project.description|linebreaks }}</div>
+                </div>
+                {% endif %}
+                
+                <div class="row mb-3">
+                    <div class="col-sm-3"><strong>作成日:</strong></div>
+                    <div class="col-sm-9">{{ project.created_at|date:"Y年m月d日 H:i" }}</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card mt-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-calendar-event"></i> スケジュール
+                </h5>
+            </div>
+            <div class="card-body">
+                {% if schedules %}
+                    <div class="table-responsive">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>分野</th>
+                                    <th>開始日</th>
+                                    <th>終了日</th>
+                                    <th>期間</th>
+                                    <th>ステータス</th>
+                                    <th>詳細</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for schedule in schedules %}
+                                <tr{% if schedule.status == 'completed' %} class="table-secondary"{% endif %}>
+                                    <td>
+                                        <span class="badge bg-primary">{{ schedule.field.name }}</span>
+                                    </td>
+                                    <td>{{ schedule.start_date|date:"Y/m/d" }}</td>
+                                    <td>{{ schedule.end_date|date:"Y/m/d" }}</td>
+                                    <td>{{ schedule.duration_days }}日</td>
+                                    <td>
+                                        {% if schedule.status == 'completed' %}
+                                            <span class="badge bg-success">
+                                                <i class="bi bi-check-circle"></i> 完了
+                                            </span>
+                                            {% if schedule.completed_at %}
+                                                <br><small class="text-muted">{{ schedule.completed_at|date:"m/d H:i" }}</small>
+                                            {% endif %}
+                                        {% elif schedule.status == 'in_progress' %}
+                                            {% now "Y-m-d" as today %}
+                                            {% if schedule.end_date|date:"Y-m-d" < today %}
+                                                <span class="badge bg-danger">
+                                                    <i class="bi bi-exclamation-triangle"></i> 遅延中
+                                                </span>
+                                                <br><small class="text-muted">期限: {{ schedule.end_date|date:"m/d" }}</small>
+                                            {% else %}
+                                                <span class="badge bg-warning text-dark">
+                                                    <i class="bi bi-clock"></i> 進行中
+                                                </span>
+                                            {% endif %}
+                                        {% else %}
+                                            <span class="badge bg-secondary">
+                                                <i class="bi bi-hourglass"></i> 予定
+                                            </span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ schedule.description|default:"-"|truncatechars:30 }}</td>
+                                    <td>
+                                        <div class="btn-group" role="group">
+                                            {% if schedule.status == 'completed' %}
+                                                <a href="{% url 'schedule:schedule_complete' schedule.id %}" 
+                                                   class="btn btn-sm btn-warning" 
+                                                   title="完了を解除"
+                                                   onclick="return confirm('完了状態を解除しますか？')">
+                                                    <i class="bi bi-arrow-counterclockwise"></i>
+                                                </a>
+                                            {% else %}
+                                                <a href="{% url 'schedule:schedule_complete' schedule.id %}" 
+                                                   class="btn btn-sm btn-success" 
+                                                   title="完了"
+                                                   onclick="return confirm('このスケジュールを完了しますか？')">
+                                                    <i class="bi bi-check-circle"></i>
+                                                </a>
+                                            {% endif %}
+                                            <a href="{% url 'schedule:schedule_edit' schedule.id %}" 
+                                               class="btn btn-sm btn-outline-primary" 
+                                               title="編集">
+                                                <i class="bi bi-pencil"></i>
+                                            </a>
+                                            <a href="{% url 'schedule:schedule_delete' schedule.id %}" 
+                                               class="btn btn-sm btn-outline-danger" 
+                                               title="削除"
+                                               onclick="return confirm('このスケジュールを削除しますか？')">
+                                                <i class="bi bi-trash"></i>
+                                            </a>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="text-center py-4">
+                        <i class="bi bi-calendar-x display-4 text-muted"></i>
+                        <p class="text-muted mt-2">まだスケジュールがありません。</p>
+                        <a href="{% url 'schedule:schedule_create' %}?project={{ project.pk }}" class="btn btn-success">
+                            <i class="bi bi-calendar-plus"></i> スケジュールを追加
+                        </a>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="card-title mb-0">クイックアクション</h6>
+            </div>
+            <div class="card-body">
+                <div class="d-grid gap-2">
+                    <a href="{% url 'schedule:project_list' %}" class="btn btn-outline-secondary">
+                        <i class="bi bi-arrow-left"></i> 案件一覧に戻る
+                    </a>
+                    {% if project.created_by == user or user.is_manager or user.is_superuser %}
+                    <a href="{% url 'schedule:project_edit' project.pk %}" class="btn btn-outline-warning">
+                        <i class="bi bi-pencil"></i> 案件を編集
+                    </a>
+                    {% endif %}
+                    <a href="{% url 'schedule:schedule_create' %}?project={{ project.pk }}" class="btn btn-outline-primary">
+                        <i class="bi bi-calendar-plus"></i> スケジュール追加
+                    </a>
+                    {% if project.created_by == user or project.assigned_to == user or user.is_manager or user.is_superuser %}
+                        {% if project.is_completed %}
+                            <a href="{% url 'schedule:project_complete' project.pk %}" class="btn btn-outline-warning">
+                                <i class="bi bi-arrow-clockwise"></i> 未完了に戻す
+                            </a>
+                        {% else %}
+                            <a href="{% url 'schedule:project_complete' project.pk %}" class="btn btn-outline-success">
+                                <i class="bi bi-check-circle"></i> 完了にする
+                            </a>
+                        {% endif %}
+                    {% endif %}
+                    <a href="{% url 'schedule:calendar' %}" class="btn btn-outline-info">
+                        <i class="bi bi-calendar"></i> カレンダー表示
+                    </a>
+                </div>
+            </div>
+        </div>
+        
+        {% if schedules %}
+        <div class="card mt-3">
+            <div class="card-header">
+                <h6 class="card-title mb-0">スケジュール概要</h6>
+            </div>
+            <div class="card-body">
+                <div class="row text-center">
+                    <div class="col-6">
+                        <div class="fw-bold">{{ schedules|length }}</div>
+                        <div class="text-muted small">スケジュール数</div>
+                    </div>
+                    <div class="col-6">
+                        <div class="fw-bold">{{ schedules.0.start_date|date:"m/d" }} ～</div>
+                        <div class="text-muted small">期間</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

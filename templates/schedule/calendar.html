@@ -1,0 +1,289 @@
+{% extends "base.html" %}
+{% load calendar_filters %}
+
+{% block title %}カレンダー - {{ block.super }}{% endblock %}
+
+{% block content %}
+
+<style>
+/* ---- スタイル ---- */
+.calendar .calendar-day { min-height: 110px; border: 1px solid #f1f3f5; padding: .25rem; transition: background-color .2s ease; }
+.calendar .calendar-day-content { position: relative; min-height: 100px; }
+.calendar .day-number { font-weight: 600; margin-bottom: .25rem; }
+.calendar .day-number.badge-today { display: inline-block; padding: .15rem .45rem; border-radius: 999px; background: #0d6efd; color: #fff; }
+
+.schedule-item { font-size: .8rem; line-height: 1.2; margin-bottom: .2rem; padding: .15rem .35rem; border-radius: .375rem; background: #f8f9fa; }
+.schedule-item.schedule--completed { background: #e9f7ef; border: 1px solid #d4efdf; }
+.schedule-item.schedule--progress { background: #eef6ff; border: 1px solid #d6e9ff; }
+.schedule-item.schedule--overdue  { background: #fff1f0; border: 1px solid #ffd6d6; }
+.schedule-title small.badge { vertical-align: middle; }
+
+.schedule-more { font-size: .75rem; color: #0d6efd; cursor: default; }
+
+/* ★ 本日セルのハイライト（セル全体薄い黄色） */
+.calendar .calendar-day.today-highlight { background: #fff9db; border-color: #ffe8a1; }
+.calendar .calendar-day.today-highlight .schedule-item { background: #ffffff; }
+.calendar .calendar-day.today-highlight .schedule--overdue  { background: #fff0e6; }
+.calendar .calendar-day.holiday-cell { background:#fff5f5; border-color:#ffe0e0; } /* 日祝：薄い赤 */
+.calendar .calendar-day.sat-cell     { background:#f0f7ff; border-color:#d6e9ff; } /* 土曜：薄い水色 */
+
+
+/* 週表示の曜日バッジ（セル内で出す） */
+.weekday-badge { display:inline-block; font-size:.7rem; padding:.05rem .35rem; border-radius:.35rem; background:#f1f3f5; color:#6c757d; margin-left:.25rem; }
+</style>
+
+<div class="row">
+  <div class="col-md-12">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+      <h1><i class="bi bi-calendar"></i> カレンダー</h1>
+      <div class="d-flex gap-2">
+        {% if is_week %}
+          <a href="?year={{ year }}&month={{ month }}" class="btn btn-outline-primary">
+            <i class="bi bi-grid-3x3-gap"></i> 月表示へ
+          </a>
+        {% else %}
+          <a href="?scope=week&start={{ today|date:'Y-m-d' }}" class="btn btn-outline-primary">
+            <i class="bi bi-calendar-week"></i> 本日から1週間
+          </a>
+        {% endif %}
+        <a href="{% url 'schedule:schedule_create' %}" class="btn btn-success">
+          <i class="bi bi-calendar-plus"></i> スケジュール追加
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row">
+  <div class="col-md-12">
+    <div class="card">
+      <div class="card-header">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          {% if is_week %}
+            <h5 class="card-title mb-0">
+              {{ week_start|date:"Y/m/d" }} ～ {{ week_end|date:"Y/m/d" }} の予定
+            </h5>
+            <div class="btn-group">
+              <a href="?scope=week&start={{ prev_start|date:'Y-m-d' }}" class="btn btn-outline-secondary">
+                <i class="bi bi-chevron-left"></i> 前の7日
+              </a>
+              <a href="?scope=week&start={{ next_start|date:'Y-m-d' }}" class="btn btn-outline-secondary">
+                次の7日 <i class="bi bi-chevron-right"></i>
+              </a>
+            </div>
+          {% else %}
+            <h5 class="card-title mb-0">{{ year }}年{{ month }}月 ({{ month_name }})</h5>
+            <div class="btn-group">
+              <a href="?year={{ prev_year }}&month={{ prev_month }}" class="btn btn-outline-secondary">
+                <i class="bi bi-chevron-left"></i> 前月
+              </a>
+              <a href="?year={{ next_year }}&month={{ next_month }}" class="btn btn-outline-secondary">
+                次月 <i class="bi bi-chevron-right"></i>
+              </a>
+            </div>
+          {% endif %}
+        </div>
+
+        <!-- 分野別の色凡例（共通） -->
+        <div class="row">
+          <div class="col-12">
+            <small class="text-muted">分野別色分け:</small>
+            <div class="d-flex flex-wrap gap-2 mt-1">
+              <span class="badge" style="background-color: #FF6B6B;">作図</span>
+              <span class="badge" style="background-color: #4ECDC4;">ソフト作成</span>
+              <span class="badge" style="background-color: #45B7D1;">配線</span>
+              <span class="badge" style="background-color: #96CEB4;">デバック</span>
+              <span class="badge" style="background-color: #FECA57; color: #333;">現地工事</span>
+              <span class="badge" style="background-color: #A55EEA;">制御盤</span>
+              <span class="badge bg-danger">遅延</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card-body">
+        <div class="calendar">
+
+          {# 月表示のときだけ固定ヘッダ（日〜土）を出す #}
+          {% if not is_week %}
+          <div class="row calendar-header">
+            <div class="col calendar-day-header text-center text-danger">日</div>
+            <div class="col calendar-day-header text-center">月</div>
+            <div class="col calendar-day-header text-center">火</div>
+            <div class="col calendar-day-header text-center">水</div>
+            <div class="col calendar-day-header text-center">木</div>
+            <div class="col calendar-day-header text-center">金</div>
+            <div class="col calendar-day-header text-center text-primary">土</div>
+          </div>
+          {% endif %}
+
+          {# ▼ 週×日マトリクス（週表示では1行7列） #}
+          {% for week in calendar_cells %}
+          <div class="row calendar-week">
+            {% for cell in week %}
+            <div class="col calendar-day
+                {% if cell.date == today %}
+                    today-highlight
+                {% elif cell.is_holiday or cell.is_sun %}
+                    holiday-cell
+                {% elif cell.is_sat %}
+                    sat-cell
+                {% endif %}
+            ">
+              <div class="calendar-day-content">
+                {% if cell.day != 0 or is_week %}
+
+                  {# 日付 + （週表示のときは曜日バッジもセル内に表示） #}
+                  {% if cell.date == today %}
+                    <div class="day-number badge-today">
+                      {{ cell.day }}
+                      {% if is_week %}<span class="weekday-badge">{{ cell.date|date:"D" }}</span>{% endif %}
+                    </div>
+                  {% else %}
+                    <div class="day-number {% if not is_week and forloop.counter0 == 0 %}text-danger{% elif not is_week and forloop.counter0 == 6 %}text-primary{% endif %}">
+                      {{ cell.day }}
+                      {% if is_week %}<span class="weekday-badge">{{ cell.date|date:"D" }}</span>{% endif %}
+                    </div>
+                  {% endif %}
+
+                  {# ▼ 担当者ごとに“全件”表示（件数は出さない） #}
+                  {% regroup cell.schedules by project.assigned_to as user_groups %}
+
+                  {% for group in user_groups %}
+                    {% with user=group.grouper %}
+                      <div class="mb-1">
+                        <div class="fw-semibold small mb-1">
+                          {% if user %}
+                            <span class="badge bg-light text-dark"><i class="bi bi-person"></i> {% if user.first_name or user.last_name %}{{ user.last_name }} {{ user.first_name }}{% else %}{{ user.username }}{% endif %}</span>
+                          {% else %}
+                            <span class="badge bg-secondary"><i class="bi bi-person-slash"></i> 未割当</span>
+                          {% endif %}
+                        </div>
+
+                        {% for schedule in group.list %}
+                          <div class="schedule-item {% if today > schedule.end_date %}schedule--overdue{% elif schedule.status == 'completed' %}schedule--completed{% else %}schedule--progress{% endif %}"
+                               data-bs-toggle="tooltip"
+                               title="{{ schedule.project.name }}（{{ schedule.start_date|date:'m/d' }}–{{ schedule.end_date|date:'m/d' }}）{% if schedule.description %}｜{{ schedule.description|striptags }}{% endif %}">
+                            <div class="schedule-title">
+                              {% if schedule.status == 'completed' %}
+                                <small class="badge bg-success me-1"><i class="bi bi-check-circle"></i> {{ schedule.field.name }}</small>
+                              {% else %}
+                                {% if schedule.field.name == '作図' %}
+                                  <small class="badge me-1" style="background-color: #FF6B6B;">{{ schedule.field.name }}</small>
+                                {% elif schedule.field.name == 'ソフト作成' %}
+                                  <small class="badge me-1" style="background-color: #4ECDC4;">{{ schedule.field.name }}</small>
+                                {% elif schedule.field.name == '配線' %}
+                                  <small class="badge me-1" style="background-color: #45B7D1;">{{ schedule.field.name }}</small>
+                                {% elif schedule.field.name == 'デバック' %}
+                                  <small class="badge me-1" style="background-color: #96CEB4;">{{ schedule.field.name }}</small>
+                                {% elif schedule.field.name == '現地工事' %}
+                                  <small class="badge me-1" style="background-color: #FECA57; color: #333;">{{ schedule.field.name }}</small>
+                                {% elif schedule.field.name == '制御盤' %}
+                                  <small class="badge me-1" style="background-color: #A55EEA;">{{ schedule.field.name }}</small>
+                                {% else %}
+                                  <small class="badge bg-secondary me-1">{{ schedule.field.name }}</small>
+                                {% endif %}
+                              {% endif %}
+                              <span>{{ schedule.project.name|truncatechars:14 }}</span>
+                              {% if schedule.status == 'completed' %}<span class="text-success">✓</span>{% endif %}
+                              {% if user.is_manager or user.is_superuser %}
+                                <br><small class="text-muted">{% if schedule.project.assigned_to.first_name or schedule.project.assigned_to.last_name %}{{ schedule.project.assigned_to.last_name }} {{ schedule.project.assigned_to.first_name }}{% else %}{{ schedule.project.assigned_to.username }}{% endif %}</small>
+                              {% endif %}
+                            </div>
+                          </div>
+                        {% endfor %}
+
+                      </div>
+                    {% endwith %}
+                  {% endfor %}
+
+                {% endif %}
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+          {% endfor %}
+
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{# ---- 下部一覧（あなたの版：製番あり） ---- #}
+<div class="row mt-4">
+  <div class="col-md-12">
+    <div class="card">
+      <div class="card-header">
+        <h5 class="card-title mb-0">
+          <i class="bi bi-list-check"></i> {{ is_week|yesno:"この7日間,この月" }}のスケジュール一覧
+        </h5>
+      </div>
+      <div class="card-body">
+        {% if schedules %}
+          <div class="table-responsive">
+            <table class="table table-hover">
+              <thead>
+                <tr>
+                  <th>案件名</th>
+                  <th>製番</th>
+                  <th>分野</th>
+                  {% if user.is_manager or user.is_superuser %}<th>担当者</th>{% endif %}
+                  <th>期間</th>
+                  <th>詳細</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for schedule in schedules %}
+                <tr>
+                  <td><a href="{% url 'schedule:project_detail' schedule.project.pk %}" class="text-decoration-none">{{ schedule.project.name }}</a></td>
+                  <td><span class="badge bg-light text-dark">{{ schedule.project.manufacturing_number|default:"-" }}</span></td>
+                  <td>
+                    {% if schedule.field.name == '作図' %}
+                      <span class="badge" style="background-color: #FF6B6B;">{{ schedule.field.name }}</span>
+                    {% elif schedule.field.name == 'ソフト作成' %}
+                      <span class="badge" style="background-color: #4ECDC4;">{{ schedule.field.name }}</span>
+                    {% elif schedule.field.name == '配線' %}
+                      <span class="badge" style="background-color: #45B7D1;">{{ schedule.field.name }}</span>
+                    {% elif schedule.field.name == 'デバック' %}
+                      <span class="badge" style="background-color: #96CEB4;">{{ schedule.field.name }}</span>
+                    {% elif schedule.field.name == '現地工事' %}
+                      <span class="badge" style="background-color: #FECA57; color: #333;">{{ schedule.field.name }}</span>
+                    {% elif schedule.field.name == '制御盤' %}
+                      <span class="badge" style="background-color: #A55EEA;">{{ schedule.field.name }}</span>
+                    {% else %}
+                      <span class="badge bg-secondary">{{ schedule.field.name }}</span>
+                    {% endif %}
+                  </td>
+                  {% if user.is_manager or user.is_superuser %}
+                    <td><span class="badge bg-info">{% if schedule.project.assigned_to.first_name or schedule.project.assigned_to.last_name %}{{ schedule.project.assigned_to.last_name }} {{ schedule.project.assigned_to.first_name }}{% else %}{{ schedule.project.assigned_to.username }}{% endif %}</span></td>
+                  {% endif %}
+                  <td>{{ schedule.start_date|date:"m/d" }} ～ {{ schedule.end_date|date:"m/d" }} ({{ schedule.duration_days }}日)</td>
+                  <td>{{ schedule.description|default:"-"|truncatechars:50 }}</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% else %}
+          <div class="text-center py-4">
+            <i class="bi bi-calendar-x display-4 text-muted"></i>
+            <p class="text-muted mt-2">該当スケジュールがありません。</p>
+          </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+{# Bootstrapのツールチップ初期化（BS5想定） #}
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    var triggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    triggerList.forEach(function (el) {
+      new bootstrap.Tooltip(el, {container: 'body', html: false, placement: 'top'});
+    });
+  });
+</script>
+
+{% endblock %}
