@@ -270,6 +270,10 @@ def project_complete_view(request, pk):
 def calendar_view(request):
     today = timezone.localdate()
 
+    # フィルタリングパラメータ
+    assigned_to_filter = request.GET.get('assigned_to', '')  # 担当者フィルタ
+    project_filter = request.GET.get('project', '')  # 案件フィルタ
+
     # ▼ 表示モード：'month'（既定） or 'week'
     scope = request.GET.get('scope', 'month')
 
@@ -291,13 +295,31 @@ def calendar_view(request):
 
         if not (request.user.is_manager or request.user.is_superuser or request.user.is_viewer):
             base_qs = base_qs.filter(Q(project__created_by=request.user) | Q(project__assigned_to=request.user))
+        
+        # フィルタリング適用（マネージャーと一般ユーザーのみ）
+        if (request.user.is_manager or request.user.is_superuser):
+            if assigned_to_filter:
+                base_qs = base_qs.filter(project__assigned_to__id=assigned_to_filter)
+        
+        # 案件フィルタは全ユーザーが使用可能
+        if project_filter:
+            base_qs = base_qs.filter(project__id=project_filter)
 
+        # 担当者の色分け情報を追加
+        colors = ['#007bff', '#28a745', '#dc3545', '#ffc107', '#6f42c1', '#fd7e14', '#20c997', '#e83e8c', '#6c757d', '#17a2b8']
+        
         # ステータス更新
         for s in base_qs:
             old = s.status
             s.update_status_by_date()
             if old != s.status:
                 s.save()
+            
+            # 担当者の色情報を追加
+            if s.project.assigned_to:
+                assigned_color_index = (s.project.assigned_to.id % 10)
+                s.assigned_bg_color = colors[assigned_color_index]
+                s.assigned_text_color = '#212529' if assigned_color_index == 3 else '#ffffff'  # 黄色の場合は黒文字
 
         # 7日間を1行に（各セルへ曜日/祝日フラグを埋め込み）
         row = []
@@ -322,6 +344,17 @@ def calendar_view(request):
         prev_start = week_start - timedelta(days=7)
         next_start = week_start + timedelta(days=7)
 
+        # フィルタ用のデータ
+        users_for_filter = []
+        projects_for_filter = []
+        if (request.user.is_manager or request.user.is_superuser or request.user.is_viewer):
+            from accounts.models import CustomUser
+            # 担当者フィルタはマネージャーと一般ユーザーのみ
+            if (request.user.is_manager or request.user.is_superuser):
+                users_for_filter = CustomUser.objects.all().order_by('last_name', 'first_name', 'username')
+            # 案件フィルタは全ユーザーが使用可能
+            projects_for_filter = Project.objects.all().order_by('name')
+
         context = {
             "is_week": True,
             "week_start": week_start,
@@ -340,6 +373,12 @@ def calendar_view(request):
             "next_month": month + 1 if month < 12 else 1,
 
             "today": today,
+            
+            # フィルタ関連
+            "users_for_filter": users_for_filter,
+            "projects_for_filter": projects_for_filter,
+            "current_assigned_to": assigned_to_filter,
+            "current_project": project_filter,
         }
         return render(request, 'schedule/calendar.html', context)
 
@@ -355,6 +394,15 @@ def calendar_view(request):
         .order_by('project__assigned_to__last_name', 'project__assigned_to__first_name', 'project__assigned_to__username', 'project__name', 'start_date')
     if not (request.user.is_manager or request.user.is_superuser or request.user.is_viewer):
         base_qs = base_qs.filter(Q(project__created_by=request.user) | Q(project__assigned_to=request.user))
+    
+    # フィルタリング適用（マネージャーと一般ユーザーのみ）
+    if (request.user.is_manager or request.user.is_superuser):
+        if assigned_to_filter:
+            base_qs = base_qs.filter(project__assigned_to__id=assigned_to_filter)
+    
+    # 案件フィルタは全ユーザーが使用可能
+    if project_filter:
+        base_qs = base_qs.filter(project__id=project_filter)
 
     # 担当者の色分け情報を追加
     colors = ['#007bff', '#28a745', '#dc3545', '#ffc107', '#6f42c1', '#fd7e14', '#20c997', '#e83e8c', '#6c757d', '#17a2b8']
@@ -401,6 +449,17 @@ def calendar_view(request):
     next_month = 1 if month == 12 else month+1
     next_year  = year+1 if month == 12 else year
 
+    # フィルタ用のデータ
+    users_for_filter = []
+    projects_for_filter = []
+    if (request.user.is_manager or request.user.is_superuser or request.user.is_viewer):
+        from accounts.models import CustomUser
+        # 担当者フィルタはマネージャーと一般ユーザーのみ
+        if (request.user.is_manager or request.user.is_superuser):
+            users_for_filter = CustomUser.objects.all().order_by('last_name', 'first_name', 'username')
+        # 案件フィルタは全ユーザーが使用可能
+        projects_for_filter = Project.objects.all().order_by('name')
+
     return render(request, 'schedule/calendar.html', {
         "is_week": False,
         "year": year, "month": month, "month_name": calendar.month_name[month],
@@ -409,6 +468,12 @@ def calendar_view(request):
         "prev_year": prev_year, "prev_month": prev_month,
         "next_year": next_year, "next_month": next_month,
         "today": today,
+        
+        # フィルタ関連
+        "users_for_filter": users_for_filter,
+        "projects_for_filter": projects_for_filter,
+        "current_assigned_to": assigned_to_filter,
+        "current_project": project_filter,
     })
 
 @login_required

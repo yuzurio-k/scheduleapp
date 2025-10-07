@@ -84,6 +84,79 @@
           {% endif %}
         </div>
 
+        <!-- フィルタ機能（マネージャーと閲覧者のみ） -->
+        {% if user.is_manager or user.is_viewer %}
+        <div class="row mt-3">
+          <div class="col-md-12">
+            <form method="get" class="row g-3">
+              <!-- 現在の表示設定を維持 -->
+              {% if is_week %}
+                <input type="hidden" name="scope" value="week">
+                <input type="hidden" name="start" value="{{ week_start|date:'Y-m-d' }}">
+              {% else %}
+                <input type="hidden" name="year" value="{{ year }}">
+                <input type="hidden" name="month" value="{{ month }}">
+              {% endif %}
+              
+              {% if user.is_manager or user.is_superuser %}
+              <div class="col-md-3">
+                <label class="form-label">担当者フィルタ:</label>
+                <select name="assigned_to" class="form-select form-select-sm">
+                  <option value="">全ての担当者</option>
+                  {% for user_item in users_for_filter %}
+                    <option value="{{ user_item.id }}" {% if current_assigned_to == user_item.id|stringformat:"s" %}selected{% endif %}>
+                      {% if user_item.first_name or user_item.last_name %}{{ user_item.last_name }} {{ user_item.first_name }}{% else %}{{ user_item.username }}{% endif %}
+                    </option>
+                  {% endfor %}
+                </select>
+              </div>
+              
+              <div class="col-md-5">
+                <label class="form-label">案件フィルタ:</label>
+                <select name="project" class="form-select form-select-sm">
+                  <option value="">全ての案件</option>
+                  {% for project_item in projects_for_filter %}
+                    <option value="{{ project_item.id }}" {% if current_project == project_item.id|stringformat:"s" %}selected{% endif %}>
+                      {{ project_item.name }}
+                    </option>
+                  {% endfor %}
+                </select>
+              </div>
+              
+              <div class="col-md-4 d-flex align-items-end">
+              {% else %}
+              <div class="col-md-8">
+                <label class="form-label">案件フィルタ:</label>
+                <select name="project" class="form-select form-select-sm">
+                  <option value="">全ての案件</option>
+                  {% for project_item in projects_for_filter %}
+                    <option value="{{ project_item.id }}" {% if current_project == project_item.id|stringformat:"s" %}selected{% endif %}>
+                      {{ project_item.name }}
+                    </option>
+                  {% endfor %}
+                </select>
+              </div>
+              
+              <div class="col-md-4 d-flex align-items-end">
+              {% endif %}
+                <button type="submit" class="btn btn-primary btn-sm me-2">
+                  <i class="bi bi-funnel"></i> フィルタ適用
+                </button>
+                {% if current_assigned_to or current_project %}
+                  {% if is_week %}
+                    <a href="?scope=week&start={{ week_start|date:'Y-m-d' }}" class="btn btn-outline-secondary btn-sm">
+                  {% else %}
+                    <a href="?year={{ year }}&month={{ month }}" class="btn btn-outline-secondary btn-sm">
+                  {% endif %}
+                      <i class="bi bi-x-circle"></i> クリア
+                    </a>
+                {% endif %}
+              </div>
+            </form>
+          </div>
+        </div>
+        {% endif %}
+
         <!-- 分野別の色凡例（共通） -->
         <div class="row">
           <div class="col-12">
