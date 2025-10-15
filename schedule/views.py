@@ -763,9 +763,7 @@ def field_create_view(request):
             field = form.save(commit=False)
             field.created_by = request.user
             field.save()
-            import uuid
-            unique_id = str(uuid.uuid4())[:8]
-            messages.success(request, f'分野を作成しました。({unique_id})')
+            messages.success(request, '分野を作成しました。')
             return redirect('schedule:field_list')
     else:
         form = FieldForm()
