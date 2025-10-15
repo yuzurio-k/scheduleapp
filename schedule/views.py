@@ -763,10 +763,9 @@ def field_create_view(request):
             field = form.save(commit=False)
             field.created_by = request.user
             field.save()
-            # メッセージを一度クリアしてから追加
-            storage = messages.get_messages(request)
-            storage.used = True
-            messages.success(request, '分野を作成しました。')
+            import uuid
+            unique_id = str(uuid.uuid4())[:8]
+            messages.success(request, f'分野を作成しました。({unique_id})')
             return redirect('schedule:field_list')
     else:
         form = FieldForm()
@@ -786,9 +785,6 @@ def field_edit_view(request, field_id):
         form = FieldForm(request.POST, instance=field)
         if form.is_valid():
             form.save()
-            # メッセージを一度クリアしてから追加
-            storage = messages.get_messages(request)
-            storage.used = True
             messages.success(request, '分野を更新しました。')
             return redirect('schedule:field_list')
     else:
@@ -813,9 +809,6 @@ def field_delete_view(request, field_id):
     
     if request.method == 'POST':
         field.delete()
-        # メッセージを一度クリアしてから追加
-        storage = messages.get_messages(request)
-        storage.used = True
         messages.success(request, '分野を削除しました。')
         return redirect('schedule:field_list')
     
