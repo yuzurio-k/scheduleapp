@@ -758,15 +758,20 @@ def field_list_view(request):
 def field_create_view(request):
     """分野作成"""
     if request.method == 'POST':
-        name = request.POST.get('name')
-        if name:
-            field = Field.objects.create(name=name)
+        form = FieldForm(request.POST)
+        if form.is_valid():
+            field = form.save(commit=False)
+            field.created_by = request.user
+            field.save()
             messages.success(request, '分野を作成しました。')
             return redirect('schedule:field_list')
-        else:
-            messages.error(request, '分野名を入力してください。')
+    else:
+        form = FieldForm()
     
-    return render(request, 'schedule/field_form.html', {'title': '分野作成'})
+    return render(request, 'schedule/field_form.html', {
+        'form': form,
+        'title': '分野作成'
+    })
 
 @login_required
 @never_cache
