@@ -76,6 +76,22 @@ class ScheduleForm(forms.ModelForm):
             'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
         }
 
+    def __init__(self, *args, **kwargs):
+        user = kwargs.pop('user', None)
+        super().__init__(*args, **kwargs)
+        
+        if user:
+            # 案件の選択肢を設定
+            if user.is_manager or user.is_superuser or user.is_viewer:
+                # 管理者系は全案件を選択可能
+                self.fields['project'].queryset = Project.objects.all().order_by('name')
+            else:
+                # 一般ユーザーは自分が関係する案件のみ
+                from django.db.models import Q
+                self.fields['project'].queryset = Project.objects.filter(
+                    Q(created_by=user) | Q(assigned_to=user)
+                ).order_by('name')
+
     def save(self, commit=True):
         instance = super().save(commit=False)
         

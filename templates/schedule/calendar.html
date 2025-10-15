@@ -30,6 +30,22 @@
 
 /* 週表示の曜日バッジ（セル内で出す） */
 .weekday-badge { display:inline-block; font-size:.7rem; padding:.05rem .35rem; border-radius:.35rem; background:#f1f3f5; color:#6c757d; margin-left:.25rem; }
+
+/* オートコンプリートのスタイル */
+#project-suggestions { 
+    width: 100%; 
+    max-height: 200px; 
+    overflow-y: auto; 
+    border: 1px solid #dee2e6; 
+    border-top: none;
+    border-radius: 0 0 0.375rem 0.375rem;
+}
+.suggestion-item:hover { 
+    background-color: #f8f9fa !important; 
+}
+.suggestion-item:last-child {
+    border-bottom: none !important;
+}
 </style>
 
 <div class="row">
@@ -38,11 +54,11 @@
       <h1><i class="bi bi-calendar"></i> カレンダー</h1>
       <div class="d-flex gap-2">
         {% if is_week %}
-          <a href="?year={{ year }}&month={{ month }}" class="btn btn-outline-primary">
+          <a href="?year={{ year }}&month={{ month }}{% if current_assigned_to %}&assigned_to={{ current_assigned_to }}{% endif %}{% if current_project %}&project={{ current_project }}{% endif %}" class="btn btn-outline-primary">
             <i class="bi bi-grid-3x3-gap"></i> 月表示へ
           </a>
         {% else %}
-          <a href="?scope=week&start={{ today|date:'Y-m-d' }}" class="btn btn-outline-primary">
+          <a href="?scope=week&start={{ today|date:'Y-m-d' }}{% if current_assigned_to %}&assigned_to={{ current_assigned_to }}{% endif %}{% if current_project %}&project={{ current_project }}{% endif %}" class="btn btn-outline-primary">
             <i class="bi bi-calendar-week"></i> 本日から1週間
           </a>
         {% endif %}
@@ -64,28 +80,27 @@
               {{ week_start|date:"Y/m/d" }} ～ {{ week_end|date:"Y/m/d" }} の予定
             </h5>
             <div class="btn-group">
-              <a href="?scope=week&start={{ prev_start|date:'Y-m-d' }}" class="btn btn-outline-secondary">
+              <a href="?scope=week&start={{ prev_start|date:'Y-m-d' }}{% if current_assigned_to %}&assigned_to={{ current_assigned_to }}{% endif %}{% if current_project %}&project={{ current_project }}{% endif %}" class="btn btn-outline-secondary">
                 <i class="bi bi-chevron-left"></i> 前の7日
               </a>
-              <a href="?scope=week&start={{ next_start|date:'Y-m-d' }}" class="btn btn-outline-secondary">
+              <a href="?scope=week&start={{ next_start|date:'Y-m-d' }}{% if current_assigned_to %}&assigned_to={{ current_assigned_to }}{% endif %}{% if current_project %}&project={{ current_project }}{% endif %}" class="btn btn-outline-secondary">
                 次の7日 <i class="bi bi-chevron-right"></i>
               </a>
             </div>
           {% else %}
             <h5 class="card-title mb-0">{{ year }}年{{ month }}月 ({{ month_name }})</h5>
             <div class="btn-group">
-              <a href="?year={{ prev_year }}&month={{ prev_month }}" class="btn btn-outline-secondary">
+              <a href="?year={{ prev_year }}&month={{ prev_month }}{% if current_assigned_to %}&assigned_to={{ current_assigned_to }}{% endif %}{% if current_project %}&project={{ current_project }}{% endif %}" class="btn btn-outline-secondary">
                 <i class="bi bi-chevron-left"></i> 前月
               </a>
-              <a href="?year={{ next_year }}&month={{ next_month }}" class="btn btn-outline-secondary">
+              <a href="?year={{ next_year }}&month={{ next_month }}{% if current_assigned_to %}&assigned_to={{ current_assigned_to }}{% endif %}{% if current_project %}&project={{ current_project }}{% endif %}" class="btn btn-outline-secondary">
                 次月 <i class="bi bi-chevron-right"></i>
               </a>
             </div>
           {% endif %}
         </div>
 
-        <!-- フィルタ機能（マネージャーと閲覧者のみ） -->
-        {% if user.is_manager or user.is_viewer %}
+        <!-- フィルタ機能（全ユーザー共通表示） -->
         <div class="row mt-3">
           <div class="col-md-12">
             <form method="get" class="row g-3">
@@ -98,7 +113,8 @@
                 <input type="hidden" name="month" value="{{ month }}">
               {% endif %}
               
-              {% if user.is_manager or user.is_superuser %}
+              <!-- 担当者フィルタ（一般ユーザー以外） -->
+              {% if user.is_manager or user.is_superuser or user.is_viewer %}
               <div class="col-md-3">
                 <label class="form-label">担当者フィルタ:</label>
                 <select name="assigned_to" class="form-select form-select-sm">
@@ -110,35 +126,22 @@
                   {% endfor %}
                 </select>
               </div>
-              
-              <div class="col-md-5">
-                <label class="form-label">案件フィルタ:</label>
-                <select name="project" class="form-select form-select-sm">
-                  <option value="">全ての案件</option>
-                  {% for project_item in projects_for_filter %}
-                    <option value="{{ project_item.id }}" {% if current_project == project_item.id|stringformat:"s" %}selected{% endif %}>
-                      {{ project_item.name }}
-                    </option>
-                  {% endfor %}
-                </select>
-              </div>
-              
-              <div class="col-md-4 d-flex align-items-end">
-              {% else %}
-              <div class="col-md-8">
-                <label class="form-label">案件フィルタ:</label>
-                <select name="project" class="form-select form-select-sm">
-                  <option value="">全ての案件</option>
-                  {% for project_item in projects_for_filter %}
-                    <option value="{{ project_item.id }}" {% if current_project == project_item.id|stringformat:"s" %}selected{% endif %}>
-                      {{ project_item.name }}
-                    </option>
-                  {% endfor %}
-                </select>
-              </div>
-              
-              <div class="col-md-4 d-flex align-items-end">
               {% endif %}
+              
+              <!-- 案件フィルタ（全ユーザー共通） -->
+              <div class="{% if user.is_manager or user.is_superuser or user.is_viewer %}col-md-5{% else %}col-md-8{% endif %}">
+                <label class="form-label">案件フィルタ:</label>
+                <input type="text" 
+                       id="project-autocomplete" 
+                       name="project_search" 
+                       class="form-control form-control-sm" 
+                       placeholder="案件名で検索..."
+                       autocomplete="off">
+                <input type="hidden" name="project" id="selected-project-id" value="{{ current_project }}">
+                <div id="project-suggestions" class="position-absolute bg-white border rounded shadow-sm" style="display: none; z-index: 1000; max-height: 200px; overflow-y: auto;"></div>
+              </div>
+              
+              <div class="col-md-4 d-flex align-items-end">
                 <button type="submit" class="btn btn-primary btn-sm me-2">
                   <i class="bi bi-funnel"></i> フィルタ適用
                 </button>
@@ -155,7 +158,6 @@
             </form>
           </div>
         </div>
-        {% endif %}
 
         <!-- 分野別の色凡例（共通） -->
         <div class="row">
@@ -343,6 +345,113 @@
     </div>
   </div>
 </div>
+
+{# 案件オートコンプリート機能 #}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const autocompleteInput = document.getElementById('project-autocomplete');
+    const suggestionsDiv = document.getElementById('project-suggestions');
+    const hiddenProjectId = document.getElementById('selected-project-id');
+    
+    // 案件データ（サーバーから渡される）
+    const projectsData = [
+        {% for project_item in projects_for_filter %}
+        {
+            id: {{ project_item.id }},
+            name: "{{ project_item.name|escapejs }}",
+            manufacturing_number: "{{ project_item.manufacturing_number|default:'-'|escapejs }}",
+            assigned_to: "{% if project_item.assigned_to.first_name or project_item.assigned_to.last_name %}{{ project_item.assigned_to.last_name }} {{ project_item.assigned_to.first_name }}{% else %}{{ project_item.assigned_to.username }}{% endif %}",
+            display: "{{ project_item.name|escapejs }} [{{ project_item.manufacturing_number|default:'-'|escapejs }}] - {% if project_item.assigned_to.first_name or project_item.assigned_to.last_name %}{{ project_item.assigned_to.last_name }} {{ project_item.assigned_to.first_name }}{% else %}{{ project_item.assigned_to.username }}{% endif %}"
+        },
+        {% endfor %}
+    ];
+    
+    // 現在選択中の案件を表示
+    if (hiddenProjectId.value) {
+        const selectedProject = projectsData.find(p => p.id == hiddenProjectId.value);
+        if (selectedProject) {
+            autocompleteInput.value = selectedProject.display;
+        }
+    }
+    
+    // 入力時の検索処理
+    autocompleteInput.addEventListener('input', function() {
+        const query = this.value.toLowerCase();
+        
+        if (query.length < 1) {
+            suggestionsDiv.style.display = 'none';
+            hiddenProjectId.value = '';
+            return;
+        }
+        
+        // 検索にマッチする案件をフィルタリング
+        const matches = projectsData.filter(project => 
+            project.name.toLowerCase().includes(query) ||
+            project.manufacturing_number.toLowerCase().includes(query) ||
+            project.assigned_to.toLowerCase().includes(query)
+        );
+        
+        // 検索結果を表示
+        if (matches.length > 0) {
+            suggestionsDiv.innerHTML = matches.map(project => `
+                <div class="p-2 border-bottom cursor-pointer suggestion-item" 
+                     data-id="${project.id}" 
+                     data-display="${project.display}"
+                     style="cursor: pointer;">
+                    <strong>${project.name}</strong><br>
+                    <small class="text-muted">[${project.manufacturing_number}] - ${project.assigned_to}</small>
+                </div>
+            `).join('');
+            
+            // 位置調整
+            const inputRect = autocompleteInput.getBoundingClientRect();
+            suggestionsDiv.style.width = autocompleteInput.offsetWidth + 'px';
+            suggestionsDiv.style.display = 'block';
+            
+            // クリックイベントを追加
+            suggestionsDiv.querySelectorAll('.suggestion-item').forEach(item => {
+                item.addEventListener('click', function() {
+                    autocompleteInput.value = this.dataset.display;
+                    hiddenProjectId.value = this.dataset.id;
+                    suggestionsDiv.style.display = 'none';
+                });
+                
+                item.addEventListener('mouseenter', function() {
+                    this.style.backgroundColor = '#f8f9fa';
+                });
+                
+                item.addEventListener('mouseleave', function() {
+                    this.style.backgroundColor = 'white';
+                });
+            });
+        } else {
+            suggestionsDiv.style.display = 'none';
+        }
+    });
+    
+    // フォーカス外で候補を非表示
+    document.addEventListener('click', function(e) {
+        if (!autocompleteInput.contains(e.target) && !suggestionsDiv.contains(e.target)) {
+            suggestionsDiv.style.display = 'none';
+        }
+    });
+    
+    // Enterキーで最初の候補を選択
+    autocompleteInput.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            const firstSuggestion = suggestionsDiv.querySelector('.suggestion-item');
+            if (firstSuggestion) {
+                firstSuggestion.click();
+            }
+        }
+        
+        if (e.key === 'Escape') {
+            suggestionsDiv.style.display = 'none';
+        }
+    });
+});
+</script>
 
 {# Bootstrapのツールチップ初期化（BS5想定） #}
 <script>

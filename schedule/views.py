@@ -187,9 +187,15 @@ def project_detail(request, pk):
         if old_status != schedule.status:
             schedule.save()
     
+    # 未完了のスケジュール数をカウント
+    incomplete_schedules = schedules.exclude(status='completed')
+    incomplete_count = incomplete_schedules.count()
+    
     return render(request, 'schedule/project_detail.html', {
         'project': project,
         'schedules': schedules,
+        'incomplete_count': incomplete_count,
+        'has_incomplete_schedules': incomplete_count > 0,
     })
 
 @login_required
@@ -256,6 +262,25 @@ def project_complete_view(request, pk):
         return redirect('schedule:project_detail', pk=project.pk)
     
     if request.method == 'POST':
+        # 案件を完了する前に、関連するすべてのスケジュールが完了しているかチェック
+        if not project.is_completed:  # 未完了から完了にする場合のみチェック
+            incomplete_schedules = project.schedule_set.exclude(status='completed')
+            
+            # ステータスを更新してから再度チェック
+            for schedule in incomplete_schedules:
+                old_status = schedule.status
+                schedule.update_status_by_date()
+                if old_status != schedule.status:
+                    schedule.save()
+            
+            # 再度未完了のスケジュールをチェック
+            incomplete_schedules = project.schedule_set.exclude(status='completed')
+            
+            if incomplete_schedules.exists():
+                incomplete_count = incomplete_schedules.count()
+                messages.error(request, f'この案件には未完了のスケジュール（{incomplete_count}件）があります。すべてのスケジュールを完了してから案件を完了してください。')
+                return redirect('schedule:project_detail', pk=project.pk)
+        
         project.toggle_completion()
         action = '完了' if project.is_completed else '未完了に戻し'
         messages.success(request, f'案件「{project.name}」を{action}ました。')
@@ -273,6 +298,7 @@ def calendar_view(request):
     # フィルタリングパラメータ
     assigned_to_filter = request.GET.get('assigned_to', '')  # 担当者フィルタ
     project_filter = request.GET.get('project', '')  # 案件フィルタ
+    project_search = request.GET.get('project_search', '')  # 案件検索テキスト
 
     # ▼ 表示モード：'month'（既定） or 'week'
     scope = request.GET.get('scope', 'month')
@@ -296,10 +322,9 @@ def calendar_view(request):
         if not (request.user.is_manager or request.user.is_superuser or request.user.is_viewer):
             base_qs = base_qs.filter(Q(project__created_by=request.user) | Q(project__assigned_to=request.user))
         
-        # フィルタリング適用（マネージャーと一般ユーザーのみ）
-        if (request.user.is_manager or request.user.is_superuser):
-            if assigned_to_filter:
-                base_qs = base_qs.filter(project__assigned_to__id=assigned_to_filter)
+        # 担当者フィルタリング適用
+        if assigned_to_filter:
+            base_qs = base_qs.filter(project__assigned_to__id=assigned_to_filter)
         
         # 案件フィルタは全ユーザーが使用可能
         if project_filter:
@@ -347,13 +372,28 @@ def calendar_view(request):
         # フィルタ用のデータ
         users_for_filter = []
         projects_for_filter = []
+        
+        # 担当者フィルタは管理者・マネージャー・閲覧者のみ
         if (request.user.is_manager or request.user.is_superuser or request.user.is_viewer):
             from accounts.models import CustomUser
-            # 担当者フィルタはマネージャーと一般ユーザーのみ
-            if (request.user.is_manager or request.user.is_superuser):
-                users_for_filter = CustomUser.objects.all().order_by('last_name', 'first_name', 'username')
-            # 案件フィルタは全ユーザーが使用可能
+            # 担当者フィルタの選択肢：マネージャーと一般ユーザーのみ（スーパーユーザーと閲覧者は除外）
+            users_for_filter = CustomUser.objects.filter(
+                is_manager=True, is_superuser=False
+            ).union(
+                CustomUser.objects.filter(
+                    is_manager=False, is_superuser=False, is_viewer=False
+                )
+            ).order_by('last_name', 'first_name', 'username')
+        
+        # 案件フィルタは全ユーザーが使用可能
+        if request.user.is_manager or request.user.is_superuser or request.user.is_viewer:
+            # 管理者系は全案件
             projects_for_filter = Project.objects.all().order_by('name')
+        else:
+            # 一般ユーザーは自分が関係する案件のみ
+            projects_for_filter = Project.objects.filter(
+                Q(created_by=request.user) | Q(assigned_to=request.user)
+            ).order_by('name')
 
         context = {
             "is_week": True,
@@ -379,6 +419,7 @@ def calendar_view(request):
             "projects_for_filter": projects_for_filter,
             "current_assigned_to": assigned_to_filter,
             "current_project": project_filter,
+            "current_project_search": project_search,
         }
         return render(request, 'schedule/calendar.html', context)
 
@@ -395,10 +436,9 @@ def calendar_view(request):
     if not (request.user.is_manager or request.user.is_superuser or request.user.is_viewer):
         base_qs = base_qs.filter(Q(project__created_by=request.user) | Q(project__assigned_to=request.user))
     
-    # フィルタリング適用（マネージャーと一般ユーザーのみ）
-    if (request.user.is_manager or request.user.is_superuser):
-        if assigned_to_filter:
-            base_qs = base_qs.filter(project__assigned_to__id=assigned_to_filter)
+    # 担当者フィルタリング適用
+    if assigned_to_filter:
+        base_qs = base_qs.filter(project__assigned_to__id=assigned_to_filter)
     
     # 案件フィルタは全ユーザーが使用可能
     if project_filter:
@@ -452,13 +492,28 @@ def calendar_view(request):
     # フィルタ用のデータ
     users_for_filter = []
     projects_for_filter = []
+    
+    # 担当者フィルタは管理者・マネージャー・閲覧者のみ
     if (request.user.is_manager or request.user.is_superuser or request.user.is_viewer):
         from accounts.models import CustomUser
-        # 担当者フィルタはマネージャーと一般ユーザーのみ
-        if (request.user.is_manager or request.user.is_superuser):
-            users_for_filter = CustomUser.objects.all().order_by('last_name', 'first_name', 'username')
-        # 案件フィルタは全ユーザーが使用可能
+        # 担当者フィルタの選択肢：マネージャーと一般ユーザーのみ（スーパーユーザーと閲覧者は除外）
+        users_for_filter = CustomUser.objects.filter(
+            is_manager=True, is_superuser=False
+        ).union(
+            CustomUser.objects.filter(
+                is_manager=False, is_superuser=False, is_viewer=False
+            )
+        ).order_by('last_name', 'first_name', 'username')
+    
+    # 案件フィルタは全ユーザーが使用可能
+    if request.user.is_manager or request.user.is_superuser or request.user.is_viewer:
+        # 管理者系は全案件
         projects_for_filter = Project.objects.all().order_by('name')
+    else:
+        # 一般ユーザーは自分が関係する案件のみ
+        projects_for_filter = Project.objects.filter(
+            Q(created_by=request.user) | Q(assigned_to=request.user)
+        ).order_by('name')
 
     return render(request, 'schedule/calendar.html', {
         "is_week": False,
@@ -474,6 +529,7 @@ def calendar_view(request):
         "projects_for_filter": projects_for_filter,
         "current_assigned_to": assigned_to_filter,
         "current_project": project_filter,
+        "current_project_search": project_search,
     })
 
 @login_required
@@ -627,38 +683,23 @@ def schedule_edit(request, pk):
     if request.user.is_viewer or not (request.user.is_manager or request.user.is_superuser or 
             schedule.project.created_by == request.user or schedule.project.assigned_to == request.user):
         messages.error(request, 'このスケジュールを編集する権限がありません。')
-        return redirect('schedule:schedule_detail', pk=schedule.pk)
+        return redirect('schedule:project_detail', pk=schedule.project.pk)
     
     if request.method == 'POST':
-        field_id = request.POST.get('field')
-        start_date = request.POST.get('start_date')
-        end_date = request.POST.get('end_date')
-        description = request.POST.get('description', '')
-
-        if field_id and start_date and end_date:
-            try:
-                field = Field.objects.get(id=field_id)
-                schedule.field = field
-                schedule.start_date = start_date
-                schedule.end_date = end_date
-                schedule.description = description
-                
-                # ステータス更新
-                schedule.update_status_by_date()
-                schedule.save()
-                
-                messages.success(request, f'スケジュール「{schedule.field.name}」を更新しました。')
-                return redirect('schedule:schedule_detail', pk=schedule.pk)
-            except Field.DoesNotExist:
-                messages.error(request, '分野が見つかりません。')
-        else:
-            messages.error(request, '全ての必須項目を入力してください。')
-
-    fields = Field.objects.all()
+        form = ScheduleForm(request.POST, instance=schedule, user=request.user)
+        if form.is_valid():
+            updated_schedule = form.save()
+            # ステータス更新
+            updated_schedule.update_status_by_date()
+            updated_schedule.save()
+            messages.success(request, f'スケジュール「{updated_schedule.field.name}」を更新しました。')
+            return redirect('schedule:project_detail', pk=updated_schedule.project.pk)
+    else:
+        form = ScheduleForm(instance=schedule, user=request.user)
     
     return render(request, 'schedule/schedule_edit.html', {
+        'form': form,
         'schedule': schedule,
-        'fields': fields,
     })
 
 @login_required
