@@ -79,10 +79,14 @@
                                     </td>
                                     <td>
                                         <div class="btn-group btn-group-sm">
+                                            {% if user == request.user %}
+                                            <a href="{% url 'accounts:profile' %}" class="btn btn-outline-primary">
+                                                <i class="bi bi-person"></i> プロフィール
+                                            </a>
+                                            {% else %}
                                             <a href="{% url 'accounts:user_edit' user.id %}" class="btn btn-outline-primary">
                                                 <i class="bi bi-pencil"></i> 編集
                                             </a>
-                                            {% if user != request.user %}
                                             <a href="{% url 'accounts:user_delete' user.id %}" class="btn btn-outline-danger">
                                                 <i class="bi bi-trash"></i> 削除
                                             </a>
