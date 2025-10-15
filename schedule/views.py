@@ -751,19 +751,6 @@ def _flags_for_date(d):
 def field_list_view(request):
     """分野一覧表示"""
     fields = Field.objects.all().order_by('name')
-    
-    # メッセージの重複を防ぐ（セッションから重複メッセージを削除）
-    storage = messages.get_messages(request)
-    unique_messages = {}
-    for message in storage:
-        if str(message) not in unique_messages:
-            unique_messages[str(message)] = message
-    
-    # 重複を除いたメッセージを再設定
-    storage.used = False
-    for msg in unique_messages.values():
-        messages.add_message(request, msg.level, msg.message, msg.tags)
-    
     return render(request, 'schedule/field_list.html', {'fields': fields})
 
 @login_required
@@ -776,6 +763,9 @@ def field_create_view(request):
             field = form.save(commit=False)
             field.created_by = request.user
             field.save()
+            # メッセージを一度クリアしてから追加
+            storage = messages.get_messages(request)
+            storage.used = True
             messages.success(request, '分野を作成しました。')
             return redirect('schedule:field_list')
     else:
@@ -796,6 +786,9 @@ def field_edit_view(request, field_id):
         form = FieldForm(request.POST, instance=field)
         if form.is_valid():
             form.save()
+            # メッセージを一度クリアしてから追加
+            storage = messages.get_messages(request)
+            storage.used = True
             messages.success(request, '分野を更新しました。')
             return redirect('schedule:field_list')
     else:
@@ -820,6 +813,9 @@ def field_delete_view(request, field_id):
     
     if request.method == 'POST':
         field.delete()
+        # メッセージを一度クリアしてから追加
+        storage = messages.get_messages(request)
+        storage.used = True
         messages.success(request, '分野を削除しました。')
         return redirect('schedule:field_list')
     
