@@ -22,5 +22,6 @@ urlpatterns = [
     # 分野管理
     path('fields/', views.field_list_view, name='field_list'),
     path('fields/create/', views.field_create_view, name='field_create'),
+    path('fields/<int:field_id>/edit/', views.field_edit_view, name='field_edit'),
     path('fields/<int:field_id>/delete/', views.field_delete_view, name='field_delete'),
 ]

@@ -43,11 +43,17 @@
                                         <td>{{ field.created_at|date:"Y年m月d日 H:i" }}</td>
                                         <td>
                                             {% if user.is_manager or user.is_superuser %}
-                                                <a href="{% url 'schedule:field_delete' field.id %}" 
-                                                   class="btn btn-sm btn-outline-danger"
-                                                   onclick="return confirm('この分野を削除しますか？')">
-                                                    <i class="fas fa-trash"></i> 削除
-                                                </a>
+                                                <div class="btn-group btn-group-sm">
+                                                    <a href="{% url 'schedule:field_edit' field.id %}" 
+                                                       class="btn btn-outline-primary">
+                                                        <i class="fas fa-edit"></i> 編集
+                                                    </a>
+                                                    <a href="{% url 'schedule:field_delete' field.id %}" 
+                                                       class="btn btn-outline-danger"
+                                                       onclick="return confirm('この分野を削除しますか？')">
+                                                        <i class="fas fa-trash"></i> 削除
+                                                    </a>
+                                                </div>
                                             {% else %}
                                                 <span class="text-muted">-</span>
                                             {% endif %}

@@ -774,6 +774,28 @@ def field_create_view(request):
     })
 
 @login_required
+@never_cache 
+@require_manager
+def field_edit_view(request, field_id):
+    """分野編集（マネージャーのみ）"""
+    field = get_object_or_404(Field, id=field_id)
+    
+    if request.method == 'POST':
+        form = FieldForm(request.POST, instance=field)
+        if form.is_valid():
+            form.save()
+            messages.success(request, '分野を更新しました。')
+            return redirect('schedule:field_list')
+    else:
+        form = FieldForm(instance=field)
+    
+    return render(request, 'schedule/field_form.html', {
+        'form': form,
+        'title': '分野編集',
+        'field': field
+    })
+
+@login_required
 @never_cache
 @require_manager
 def field_delete_view(request, field_id):
